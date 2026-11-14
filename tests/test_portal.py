@@ -2,11 +2,13 @@ import re
 import sqlite3
 import tempfile
 from contextlib import closing
+from datetime import date
 import unittest
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from semester import create_app
+from semester.demo import academic_results
 
 DEMO = [
     ("lera@demo.example", "Semestr-Lera-26"),
@@ -114,6 +116,11 @@ class PortalTest(unittest.TestCase):
         })
         self.assertEqual(result.status_code, 303)
         self.assertNotIn('data-unread="schedule-a"', self.browser.get("/notifications").get_data(as_text=True))
+
+    def test_exam_calendar_stays_stable_through_judging(self):
+        before = academic_results(1, date(2026, 11, 22))
+        after = academic_results(1, date(2026, 11, 28))
+        self.assertEqual(before, after)
 
     def test_document_ready_notification_opens_owned_document(self):
         self.login()

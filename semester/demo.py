@@ -72,7 +72,7 @@ def fmt_date(day):
     return f"{day.day} {MONTH[day.month - 1]}"
 
 
-def fmt_request_day(value):
+def timestamp_day(value):
     return datetime.fromtimestamp(value, MOSCOW).date()
 
 
@@ -104,11 +104,8 @@ def next_lesson(group, at):
 
 
 def academic_results(student, day):
-    start = week_start(day)
-    # The contest demo has a stable November session. Move stale dates forward
-    # by whole weeks so the same demo data stays usable after the contest.
-    demo_start = date(2026, 11, 16)
-    start = max(start, demo_start)
+    demo_start = date(2026, 11, 23)
+    start = demo_start if day <= date(2026, 12, 7) else week_start(day)
     return [{"title": title, "kind": kind, "result": result,
              "date": start + timedelta(days=offset)}
             for title, kind, result, offset in GRADES[student]]
@@ -121,17 +118,17 @@ def notices(student, stamp):
     if current.weekday() > 0 or stamp.strftime("%H:%M") >= ("13:30" if student["id"] == 1 else "12:30"):
         change_day += timedelta(days=7)
     moved = next(item for item in lessons_on(group, change_day) if item["previous"])
-    deadline = week_start(current) + timedelta(days=4)
-    if deadline < current:
-        deadline += timedelta(days=7)
-    if student["id"] == 1:
-        special = {"id": "deadline-a", "kind": "Срок", "title": "Анкета по учебным курсам",
-                   "body": "Оставьте обратную связь по курсам в учебной группе. Анкета открыта до 18:00 по Москве.",
-                   "date": deadline, "icon": "clock", "link": "/grades", "action": "К успеваемости"}
-    else:
-        special = {"id": "deadline-b", "kind": "Срок", "title": "Подтвердите тему проекта",
-                   "body": "Согласуйте тему семестрового проекта с преподавателем до 18:00 по Москве.",
-                   "date": deadline, "icon": "clock", "link": "/grades", "action": "К успеваемости"}
+    checkpoint = min(
+        (row for row in academic_results(student["id"], current) if not row["result"]),
+        key=lambda row: row["date"],
+    )
+    special = {
+        "id": "deadline-a" if student["id"] == 1 else "deadline-b",
+        "kind": "Сессия", "title": f"{checkpoint['kind']}: {checkpoint['title']}",
+        "body": "Проверьте дату ближайшей контрольной точки и другие сроки сессии.",
+        "date": checkpoint["date"], "icon": "clock", "link": "/grades#session-heading",
+        "action": "К датам сессии",
+    }
     return [
         {"id": "schedule-a" if student["id"] == 1 else "schedule-b", "kind": "Расписание",
          "title": moved["title"],

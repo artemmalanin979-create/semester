@@ -1,11 +1,10 @@
 import secrets
 import sqlite3
+import time
 from hashlib import sha256
 from pathlib import Path
 
 from flask import current_app, g
-from werkzeug.security import generate_password_hash
-
 from .demo import STUDENTS, now
 
 SCHEMA = """
@@ -61,19 +60,31 @@ def session_hash(value):
     return sha256(value.encode("ascii")).hexdigest()
 
 
-def initialize(path, passwords):
+def enable_wal(db):
+    deadline = time.monotonic() + 8
+    while True:
+        try:
+            db.execute("PRAGMA journal_mode = WAL")
+            return
+        except sqlite3.OperationalError as error:
+            if error.sqlite_errorcode != sqlite3.SQLITE_BUSY or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.05)
+
+
+def initialize(path, password_hashes):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = connect(path)
     try:
-        db.execute("PRAGMA journal_mode = WAL")
+        enable_wal(db)
         db.executescript(SCHEMA)
         with db:
             db.execute("BEGIN IMMEDIATE")
             if db.execute("SELECT 1 FROM students LIMIT 1").fetchone():
                 return
-            for student, password in zip(STUDENTS, passwords, strict=True):
+            for student, password_hash in zip(STUDENTS, password_hashes, strict=True):
                 db.execute("INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                           (*student, generate_password_hash(password)))
+                           (*student, password_hash))
             stamp = int(now().timestamp())
             db.executemany(
                 "INSERT INTO requests VALUES (?, ?, ?, ?, ?, ?, ?, ?)",

@@ -5,13 +5,14 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
+from click import ClickException
 from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import close_db, get_db, initialize, session_hash
 from .demo import (
-    REQUEST_TYPES, SHORT_DAY, WEEKDAY, academic_results, fmt_date, fmt_dt, fmt_request_day,
+    REQUEST_TYPES, SHORT_DAY, WEEKDAY, academic_results, fmt_date, fmt_dt, timestamp_day,
     lessons_on, next_lesson, notices, now, week_start,
 )
 
@@ -25,6 +26,10 @@ NAV = (
 
 DELIVERY = {"digital": "Электронно", "office": "В деканате"}
 READY_DELAY = 120
+LOCAL_HASHES = (
+    "scrypt:32768:8:1$RUE0Sr0umX59HRbk$609960ab64f10a3e222acd29038670c30ef2c1161fc1ad58842d0fdf0ce86958a0d368f21b5914a15a5b220476b959248d5b18487c5f8385375c0c4c0df180f1",
+    "scrypt:32768:8:1$OEaczuaFNx7CUTm4$c6b8551ddc54688de0d093f6f9e5ccfbc3f8d10f95c2e421f50e50a41344ecd7dab94892c811d9765a3740be7187a2a556080737409875c5970cd78c1edee8ba",
+)
 SESSION_TTL = 8 * 60 * 60
 TOKEN = re.compile(r"[0-9a-f]{32}")
 
@@ -40,18 +45,34 @@ def create_app(config=None):
         SESSION_COOKIE_SAMESITE="Lax",
         MAX_CONTENT_LENGTH=32 * 1024,
         TRUST_PROXY=os.environ.get("SEMESTER_TRUST_PROXY") == "1",
-        DEMO_PASSWORDS=(os.environ.get("SEMESTER_LERA_PASSWORD") or ("Semestr-Lera-26" if local else None),
-                        os.environ.get("SEMESTER_MISHA_PASSWORD") or ("Semestr-Misha-26" if local else None)),
+        DEMO_PASSWORDS=(os.environ.get("SEMESTER_LERA_PASSWORD"), os.environ.get("SEMESTER_MISHA_PASSWORD")),
     )
     app.config.update(config or {})
     if not app.config["SECRET_KEY"] or (not local and len(app.config["SECRET_KEY"]) < 32):
         raise RuntimeError("Set SEMESTER_SECRET to a random string of at least 32 characters.")
-    if not all(app.config["DEMO_PASSWORDS"]):
-        raise RuntimeError("Set SEMESTER_LERA_PASSWORD and SEMESTER_MISHA_PASSWORD.")
+    passwords = app.config["DEMO_PASSWORDS"]
+    if not local and (not all(passwords) or min(map(len, passwords)) < 12 or passwords[0] == passwords[1]):
+        raise RuntimeError("Set two distinct demo passwords of at least 12 characters.")
     if app.config["TRUST_PROXY"]:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
-    initialize(app.config["DATABASE"], app.config["DEMO_PASSWORDS"])
+    password_hashes = tuple(
+        generate_password_hash(password) if password else fallback
+        for password, fallback in zip(passwords, LOCAL_HASHES, strict=True)
+    )
+    initialize(app.config["DATABASE"], password_hashes)
     app.teardown_appcontext(close_db)
+
+    @app.cli.command("rotate-demo-passwords")
+    def rotate_demo_passwords():
+        """Apply the demo passwords from the environment and revoke active sessions."""
+        if not all(passwords):
+            raise ClickException("Set both demo passwords before rotating.")
+        db = get_db()
+        with db:
+            db.executemany("UPDATE students SET password_hash = ? WHERE id = ?",
+                           zip(password_hashes, (1, 2), strict=True))
+            db.execute("DELETE FROM login_sessions")
+
     dummy_hash = generate_password_hash(secrets.token_urlsafe(24))
 
     def csrf():
@@ -148,7 +169,7 @@ def create_app(config=None):
                 action = "Открыть документ"
             items.append({
                 "id": "request-" + row["id"], "kind": "Заявки", "title": title,
-                "body": message, "date": fmt_request_day(row["ready_at"]), "icon": "file",
+                "body": message, "date": timestamp_day(row["ready_at"]), "icon": "file",
                 "link": url_for(endpoint, request_id=row["id"]), "action": action,
             })
         seen = {(row["notice_id"], row["read_key"]) for row in get_db().execute(
@@ -222,7 +243,9 @@ def create_app(config=None):
         upcoming = next_lesson(group, g.stamp)
         agenda = today or (lessons_on(group, upcoming["day"]) if upcoming else [])
         return render_template("home.html", active="home", day=day, today=today, agenda=agenda,
-                               upcoming=upcoming, items=my_notices(), recent=owned_requests(2))
+                               upcoming=upcoming, in_class=bool(upcoming and upcoming["day"] == day
+                                                             and upcoming["start"] <= g.stamp.strftime("%H:%M")),
+                               items=my_notices(), recent=owned_requests(2))
 
     @app.get("/schedule")
     def schedule():

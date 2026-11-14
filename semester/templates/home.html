@@ -10,9 +10,9 @@
 {% if upcoming %}
 <section class="next-class" aria-labelledby="next-heading">
   <div class="next-content">
-    <div class="next-kicker"><span class="live-dot"></span> Ближайшая пара</div>
+    <div class="next-kicker"><span class="live-dot"></span> {{ 'Идёт сейчас' if in_class else 'Ближайшая пара' }}</div>
     <h2 id="next-heading">{{ upcoming.title }}</h2>
-    <p class="next-meta"><span>{{ icon('clock', 17) }}{{ 'Сегодня' if upcoming.day == day else fmt_date(upcoming.day) }}, {{ upcoming.start }}</span><span>{{ icon('pin', 17) }} {{ upcoming.room }}</span></p>
+    <p class="next-meta"><span>{{ icon('clock', 17) }}{{ 'До ' ~ upcoming.end if in_class else ('Сегодня' if upcoming.day == day else fmt_date(upcoming.day)) ~ ', ' ~ upcoming.start }}</span><span>{{ icon('pin', 17) }} {{ upcoming.room }}</span></p>
     <a class="button lime" href="{{ url_for('schedule', date=upcoming.day.isoformat()) }}#{{ upcoming.id }}">Открыть расписание {{ icon('arrow', 17) }}</a>
   </div>
 </section>
