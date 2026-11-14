@@ -565,10 +565,11 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
-.profile-fields dt { color: var(--muted); font-size: 14px; }
+.profile-fields dt { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
 .profile-fields dd { margin: 0; font-size: 14px; font-weight: 630; overflow-wrap: anywhere; }
 .document-label { margin-bottom: 7px; color: var(--muted); font-size: 13px; }
 .document-panel h1 { margin-bottom: 14px; font-size: 38px; }
+.document-panel .profile-fields > div { grid-template-columns: minmax(0, 1fr) auto; gap: 16px; }
 .document-panel p + .profile-fields, .document-panel .button { margin-top: 14px; }
 .error-panel { margin-block: 25px; }
 .signed-out .error-panel { width: min(90vw, 670px); margin-inline: auto; }
