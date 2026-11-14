@@ -1,5 +1,7 @@
 import re
+import sqlite3
 import tempfile
+from contextlib import closing
 import unittest
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -112,6 +114,24 @@ class PortalTest(unittest.TestCase):
         })
         self.assertEqual(result.status_code, 303)
         self.assertNotIn('data-unread="schedule-a"', self.browser.get("/notifications").get_data(as_text=True))
+
+    def test_document_ready_notification_opens_owned_document(self):
+        self.login()
+        response = self.send_request()
+        path = urlsplit(response.location).path
+        self.assertEqual(self.browser.get(path + "/document").status_code, 404)
+        with closing(sqlite3.connect(self.config["DATABASE"])) as database, database:
+            database.execute("UPDATE requests SET ready_at = 0 WHERE id = ?", (path.split("/")[-1],))
+        notices = self.browser.get("/notifications").get_data(as_text=True)
+        self.assertIn("Справка об обучении готова", notices)
+        notice_id = "request-" + path.split("/")[-1]
+        self.assertIn(f'data-unread="{notice_id}"', notices)
+        detail = self.browser.get("/notifications/" + notice_id).get_data(as_text=True)
+        self.assertIn(path + "/document", detail)
+        self.assertIn("Валерия Ильинична", self.browser.get(path + "/document").get_data(as_text=True))
+        other = self.app.test_client()
+        self.login(other, 1)
+        self.assertEqual(other.get("/notifications/" + notice_id).status_code, 404)
 
     def test_invalid_request_payload_stays_on_form(self):
         self.login()

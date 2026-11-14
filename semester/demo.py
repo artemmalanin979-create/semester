@@ -72,6 +72,10 @@ def fmt_date(day):
     return f"{day.day} {MONTH[day.month - 1]}"
 
 
+def fmt_request_day(value):
+    return datetime.fromtimestamp(value, MOSCOW).date()
+
+
 def fmt_dt(value):
     stamp = datetime.fromtimestamp(value, MOSCOW)
     return f"{fmt_date(stamp)}, {stamp:%H:%M}"

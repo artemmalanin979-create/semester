@@ -11,7 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import close_db, get_db, initialize, session_hash
 from .demo import (
-    REQUEST_TYPES, SHORT_DAY, WEEKDAY, academic_results, fmt_date, fmt_dt,
+    REQUEST_TYPES, SHORT_DAY, WEEKDAY, academic_results, fmt_date, fmt_dt, fmt_request_day,
     lessons_on, next_lesson, notices, now, week_start,
 )
 
@@ -104,6 +104,7 @@ def create_app(config=None):
         item["title"], _, item["icon"] = REQUEST_TYPES[item["kind"]]
         item["ready"] = g.epoch >= item["ready_at"]
         item["status"] = "Готово" if item["ready"] else "В обработке"
+        item["remaining"] = max(0, item["ready_at"] - g.epoch)
         return item
 
     def owned_requests(limit):
@@ -123,13 +124,43 @@ def create_app(config=None):
         return request_summary(row)
 
     def my_notices():
+        if "notices" in g:
+            return g.notices
         items = notices(g.student, g.stamp)
+        ready = get_db().execute(
+            """SELECT * FROM requests WHERE student_id = ? AND ready_at <= ?
+               ORDER BY ready_at DESC LIMIT 24""",
+            (g.student["id"], g.epoch),
+        ).fetchall()
+        for row in ready:
+            endpoint = "request_detail"
+            action = "К заявке"
+            if row["kind"] == "appeal":
+                title = "Ответ на заявление готов"
+                message = "Ответ деканата доступен на странице заявки."
+            elif row["delivery"] == "office":
+                title = REQUEST_TYPES[row["kind"]][0] + " готова"
+                message = "Документ можно забрать в деканате. На странице заявки есть адрес и часы работы."
+            else:
+                title = REQUEST_TYPES[row["kind"]][0] + " готова"
+                message = "Электронный документ доступен в кабинете."
+                endpoint = "request_document"
+                action = "Открыть документ"
+            items.append({
+                "id": "request-" + row["id"], "kind": "Заявки", "title": title,
+                "body": message, "date": fmt_request_day(row["ready_at"]), "icon": "file",
+                "link": url_for(endpoint, request_id=row["id"]), "action": action,
+            })
         seen = {(row["notice_id"], row["read_key"]) for row in get_db().execute(
             "SELECT notice_id, read_key FROM notification_reads WHERE student_id = ?", (g.student["id"],)
         )}
         for item in items:
-            item["read_key"] = item["date"].isoformat() if item["kind"] != "Деканат" else "office-v1"
+            if item["kind"] in {"Деканат", "Заявки"}:
+                item["read_key"] = "1"
+            else:
+                item["read_key"] = item["date"].isoformat()
             item["unread"] = (item["id"], item["read_key"]) not in seen
+        g.notices = items
         return items
 
     @app.context_processor

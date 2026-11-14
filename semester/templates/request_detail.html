@@ -17,7 +17,7 @@
     {% elif item.delivery == 'office' %}<p class="callout">{{ icon('pin', 19) }}<span>Заберите документ в кабинете <strong>А–116</strong> в будни с 10:00 до 17:00. Возьмите студенческий билет.</span></p>
     {% else %}<a class="button primary" href="{{ url_for('request_document', request_id=item.id) }}">Открыть документ {{ icon('arrow', 17) }}</a>{% endif %}
   {% else %}
-    <a class="button secondary" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 18) }} Обновить статус</a>
+    <a class="button secondary" data-refresh-seconds="{{ item.remaining }}" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 18) }} Обновить статус</a>
   {% endif %}
   <p class="form-hint">Обработка в прототипе имитируется и занимает две минуты.</p>
 </section>

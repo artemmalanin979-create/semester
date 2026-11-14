@@ -14,3 +14,9 @@ if (printButton) {
   printButton.hidden = false;
   printButton.addEventListener("click", () => window.print());
 }
+
+const statusLink = document.querySelector("[data-refresh-seconds]");
+if (statusLink) {
+  const delay = (Number(statusLink.dataset.refreshSeconds) + 1) * 1000;
+  window.setTimeout(() => window.location.reload(), delay);
+}

@@ -18,16 +18,6 @@
 </section>
 {% endif %}
 <div class="dashboard-grid">
-  <section class="dashboard-agenda" aria-labelledby="agenda-heading">
-    <div class="section-heading">
-      <div><h2 id="agenda-heading">{{ 'Сегодня в расписании' if today else 'Следующий учебный день' }}</h2>
-      {% if agenda %}<p>{{ weekdays[agenda[0].day.weekday()] }}, {{ fmt_date(agenda[0].day) }}</p>{% endif %}</div>
-      <a class="text-link" href="{{ url_for('schedule', date=agenda[0].day.isoformat() if agenda else day.isoformat(), view='week') }}">На неделю {{ icon('arrow', 16) }}</a>
-    </div>
-    <div class="surface lesson-list">
-      {% for item in agenda %}{{ lesson(item) }}{% else %}<p class="empty">На сегодня занятий нет.</p>{% endfor %}
-    </div>
-  </section>
   <section class="dashboard-attention" aria-labelledby="attention-heading">
     <div class="section-heading"><div><h2 id="attention-heading">Важное</h2><p>Переносы и сроки</p></div><a class="icon-button outline" href="{{ url_for('notifications') }}" aria-label="Все уведомления">{{ icon('up-right', 17) }}</a></div>
     <div class="surface attention-list">
@@ -39,6 +29,16 @@
         {{ icon('chevron', 17) }}
       </a>
       {% endfor %}
+    </div>
+  </section>
+  <section class="dashboard-agenda" aria-labelledby="agenda-heading">
+    <div class="section-heading">
+      <div><h2 id="agenda-heading">{{ 'Сегодня в расписании' if today else 'Следующий учебный день' }}</h2>
+      {% if agenda %}<p>{{ weekdays[agenda[0].day.weekday()] }}, {{ fmt_date(agenda[0].day) }}</p>{% endif %}</div>
+      <a class="text-link" href="{{ url_for('schedule', date=agenda[0].day.isoformat() if agenda else day.isoformat(), view='week') }}">На неделю {{ icon('arrow', 16) }}</a>
+    </div>
+    <div class="surface lesson-list">
+      {% for item in agenda %}{{ lesson(item) }}{% else %}<p class="empty">На сегодня занятий нет.</p>{% endfor %}
     </div>
   </section>
   <section class="dashboard-requests" aria-labelledby="recent-heading">
