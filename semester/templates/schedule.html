@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, pageheading, lesson %}
+{% block title %}Расписание · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Расписание', 'Группа ' ~ g.student.student_group ~ ' · московское время') }}
+<div class="schedule-controls surface">
+  <div class="switch"><a href="{{ url_for('schedule') }}"{% if view == 'day' and selected == today %} aria-current="page"{% endif %}>Сегодня</a><a href="{{ url_for('schedule', view='week', date=selected.isoformat()) }}"{% if view == 'week' %} aria-current="page"{% endif %}>Неделя</a></div>
+  <div class="week-control">
+    <a class="icon-button outline" href="{{ url_for('schedule', view=view, date=prev.isoformat()) }}" aria-label="Предыдущая неделя">{{ icon('left', 17) }}</a>
+    <strong>{{ fmt_date(week[0]) }} – {{ fmt_date(week[-1]) }}</strong>
+    <a class="icon-button outline" href="{{ url_for('schedule', view=view, date=next.isoformat()) }}" aria-label="Следующая неделя">{{ icon('chevron', 17) }}</a>
+  </div>
+  <div class="week-days" aria-label="Дни недели">
+    {% for date in week %}
+    <a class="{% if date == selected %}selected{% endif %}" href="{{ url_for('schedule', date=date.isoformat()) }}"{% if date == selected and view == 'day' %} aria-current="date"{% endif %} aria-label="{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}"><span>{{ short_day[date.weekday()] }}</span><b>{{ date.day }}</b></a>
+    {% endfor %}
+  </div>
+</div>
+<div class="schedule-days">
+  {% for date, lessons in days %}
+  <section class="schedule-day" aria-label="{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}">
+    <div class="section-heading"><h2>{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}</h2>{% if date == today %}<span class="pill green">Сегодня</span>{% endif %}</div>
+    <div class="surface lesson-list">
+      {% for item in lessons %}{{ lesson(item) }}{% else %}<p class="empty">{{ icon('calendar', 22) }} Занятий нет.</p>{% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon %}
+{% block title %}Документ · Семестр{% endblock %}
+{% block content %}
+<a class="text-link back-link no-print" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('left', 18) }} К заявке</a>
+<article class="surface detail-panel document-panel">
+  <p class="document-label">Демонстрационный образец</p><h1>{{ item.title }}</h1>
+  <p>{{ g.student.full_name }} учится на {{ g.student.course }} курсе по направлению «{{ g.student.program }}» в группе {{ g.student.student_group }}.</p>
+  {% if records %}<dl class="profile-fields">{% for row in records %}<div><dt>{{ row.title }}</dt><dd>{{ row.result or 'Ожидается' }}</dd></div>{% endfor %}</dl>{% endif %}
+  <p class="form-hint">Документ создан в конкурсном прототипе на вымышленных данных и не имеет юридической силы.</p>
+  <button type="button" class="button secondary no-print" data-print hidden>{{ icon('print', 18) }} Распечатать или сохранить PDF</button>
+</article>
+{% endblock %}

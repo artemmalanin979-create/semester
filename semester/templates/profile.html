@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading %}
+{% block title %}Профиль · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Профиль', 'Учебные данные тестового аккаунта.') }}
+<section class="surface detail-panel profile-panel">
+  <div class="profile-head"><span class="avatar big">{{ g.student.name.split()[0][0] }}{{ g.student.name.split()[1][0] }}</span><div><h2>{{ g.student.name }}</h2><p>{{ g.student.email }}</p></div></div>
+  <dl class="profile-fields">
+    <div><dt>ФИО</dt><dd>{{ g.student.full_name }}</dd></div>
+    <div><dt>Факультет</dt><dd>{{ g.student.faculty }}</dd></div>
+    <div><dt>Направление</dt><dd>{{ g.student.program }}</dd></div>
+    <div><dt>Курс</dt><dd>{{ g.student.course }}</dd></div>
+    <div><dt>Группа</dt><dd>{{ g.student.student_group }}</dd></div>
+  </dl>
+  <form method="post" action="{{ url_for('logout') }}">{{ csrf_field(csrf) }}<button class="button secondary">{{ icon('logout', 18) }} Выйти из кабинета</button></form>
+</section>
+{% endblock %}

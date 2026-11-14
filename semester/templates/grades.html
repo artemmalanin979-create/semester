@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, pageheading, pill %}
+{% block title %}Успеваемость · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Успеваемость', 'Осенний семестр · ' ~ g.student.student_group) }}
+<div class="grade-overview">
+  <section class="surface stat"><span class="tile-icon">{{ icon('chart', 21) }}</span><p>Средняя оценка</p><strong>{{ average }}<small> / 5</small></strong><span>По выставленным оценкам</span></section>
+  <section class="surface stat"><span class="tile-icon">{{ icon('check', 21) }}</span><p>Закрыто дисциплин</p><strong>{{ completed }}<small> / {{ records|length }}</small></strong><progress value="{{ completed }}" max="{{ records|length }}" aria-label="Закрыто дисциплин"></progress></section>
+  <section class="surface stat"><span class="tile-icon">{{ icon('calendar', 21) }}</span><p>Предстоит на сессии</p><strong>{{ upcoming|length }}</strong><span>{{ ('Ближайшая дата — ' ~ fmt_date(upcoming[0].date)) if upcoming else 'Сессия закрыта' }}</span></section>
+</div>
+<div class="content-stack">
+  <section aria-labelledby="results-heading"><div class="section-heading"><h2 id="results-heading">Дисциплины</h2></div>
+    <div class="surface result-list">{% for row in records %}
+      <article class="result-row"><div><h3>{{ row.title }}</h3><p>{{ row.kind }}</p></div>{{ pill(row.result or 'Ожидается', 'green' if row.result else '') }}</article>
+    {% endfor %}</div>
+  </section>
+  <section aria-labelledby="session-heading"><div class="section-heading"><h2 id="session-heading">Предстоящая сессия</h2></div>
+    <div class="surface result-list">{% for row in upcoming %}
+      <article class="result-row"><div><h3>{{ row.title }}</h3><p>{{ row.kind }}</p></div><strong>{{ fmt_date(row.date) }}</strong></article>
+    {% else %}<p class="empty">Все результаты выставлены.</p>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}

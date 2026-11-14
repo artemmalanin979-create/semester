@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, pill, pageheading %}
+{% block title %}{{ item.title }} · Семестр{% endblock %}
+{% block content %}
+<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 18) }} Все заявки</a>
+{{ pageheading(item.title, 'Заявка № ' ~ item.id[:8]|upper) }}
+<section class="surface detail-panel" aria-labelledby="status-heading">
+  <div class="detail-head"><h2 id="status-heading">Ход заявки</h2>{{ pill(item.status, 'green' if item.ready else 'amber') }}</div>
+  <ol class="timeline">
+    <li class="done"><span class="timeline-mark">{{ icon('check', 14) }}</span><div><strong>Принята</strong><p>{{ fmt_dt(item.created_at) }}</p></div></li>
+    <li class="{{ 'done' if item.ready else 'current' }}"><span class="timeline-mark">{{ icon('check' if item.ready else 'clock', 14) }}</span><div><strong>В обработке</strong><p>{{ 'Способ получения — ' ~ delivery[item.delivery]|lower ~ '.' if item.kind != 'appeal' else 'Заявление направлено на рассмотрение.' }}</p></div></li>
+    <li class="{{ 'done' if item.ready else '' }}"><span class="timeline-mark">{{ icon('check', 14) if item.ready else '' }}</span><div><strong>{{ 'Ответ готов' if item.kind == 'appeal' else 'Справка готова' }}</strong><p>{{ fmt_dt(item.ready_at) if item.ready else 'Ожидается ' ~ fmt_dt(item.ready_at) }}</p></div></li>
+  </ol>
+  {% if item.comment %}<div class="request-comment"><strong>Комментарий к заявке</strong><p>{{ item.comment }}</p></div>{% endif %}
+  {% if item.ready %}
+    {% if item.kind == 'appeal' %}<p class="callout">{{ icon('message', 19) }}<span><strong>Ответ деканата</strong> Заявление рассмотрено в демонстрационном режиме. По этому сценарию дополнительных действий не требуется.</span></p>
+    {% elif item.delivery == 'office' %}<p class="callout">{{ icon('pin', 19) }}<span>Заберите документ в кабинете <strong>А–116</strong> в будни с 10:00 до 17:00. Возьмите студенческий билет.</span></p>
+    {% else %}<a class="button primary" href="{{ url_for('request_document', request_id=item.id) }}">Открыть документ {{ icon('arrow', 17) }}</a>{% endif %}
+  {% else %}
+    <a class="button secondary" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 18) }} Обновить статус</a>
+  {% endif %}
+  <p class="form-hint">Обработка в прототипе имитируется и занимает две минуты.</p>
+</section>
+{% endblock %}

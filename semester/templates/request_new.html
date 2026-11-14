@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading %}
+{% set title, description, glyph = request_types[kind] %}
+{% block title %}{{ title }} · Семестр{% endblock %}
+{% block content %}
+<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 18) }} Все заявки</a>
+{{ pageheading(title, description) }}
+<form method="post" class="surface detail-panel form-panel">
+  {{ csrf_field(csrf) }}
+  <input type="hidden" name="nonce" value="{{ nonce }}">
+  {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+  {% if kind != 'appeal' %}
+  <fieldset><legend>Как получить документ</legend>
+    <label class="radio-option"><input type="radio" name="delivery" value="digital" required{% if selected == 'digital' %} checked{% endif %}><span><strong>Электронно</strong><small>Документ появится на странице заявки.</small></span></label>
+    <label class="radio-option"><input type="radio" name="delivery" value="office" required{% if selected == 'office' %} checked{% endif %}><span><strong>В деканате</strong><small>Кабинет А–116. Возьмите студенческий билет.</small></span></label>
+  </fieldset>
+  {% endif %}
+  <label for="comment">{{ 'Ваше заявление' if kind == 'appeal' else 'Комментарий' }}{% if kind != 'appeal' %} <small>по желанию</small>{% endif %}</label>
+  <textarea name="comment" id="comment" rows="4" maxlength="500" placeholder="{{ 'Опишите, с чем нужна помощь' if kind == 'appeal' else 'Например, для подачи документов' }}"{% if kind == 'appeal' %} required minlength="10"{% endif %}>{{ comment }}</textarea>
+  <p class="form-hint">Используйте только вымышленные данные.</p>
+  <button type="submit" class="button primary">Подать заявку {{ icon('arrow', 18) }}</button>
+</form>
+{% endblock %}

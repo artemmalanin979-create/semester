@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, pageheading, request_row %}
+{% block title %}Заявки · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Заявки и справки', 'Закажите документ, подайте заявление или проверьте статус.') }}
+<div class="request-catalog">
+  {% for kind, (title, description, glyph) in request_types.items() %}
+  <a class="surface catalog-card" href="{{ url_for('request_new', kind=kind) }}"><span class="tile-icon">{{ icon(glyph, 22) }}</span>{{ icon('up-right', 19) }}<h2>{{ title }}</h2><p>{{ description }}</p></a>
+  {% endfor %}
+</div>
+<section class="content-stack"><div class="section-heading"><h2>Мои заявки</h2></div>
+  <div class="surface request-list">
+  {% for item in items %}{{ request_row(item, fmt_dt) }}{% else %}<p class="empty">На этой странице заявок нет.</p>{% endfor %}
+  </div>
+  {% if page > 1 or more %}<nav class="pagination" aria-label="Страницы заявок">
+    {% if page > 1 %}<a class="button secondary" href="{{ url_for('requests_list', page=page - 1) }}">Назад</a>{% endif %}
+    {% if more %}<a class="button secondary" href="{{ url_for('requests_list', page=page + 1) }}">Дальше</a>{% endif %}
+  </nav>{% endif %}
+</section>
+{% endblock %}
