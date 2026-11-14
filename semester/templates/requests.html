@@ -3,11 +3,18 @@
 {% block title %}Заявки · Семестр{% endblock %}
 {% block content %}
 {{ pageheading('Заявки и справки', 'Закажите документ, подайте заявление или проверьте статус.') }}
-<div class="request-catalog">
-  {% for kind, (title, description, glyph) in request_types.items() %}
-  <a class="surface catalog-card" href="{{ url_for('request_new', kind=kind) }}"><span class="tile-icon">{{ icon(glyph, 22) }}</span>{{ icon('up-right', 19) }}<h2>{{ title }}</h2><p>{{ description }}</p></a>
-  {% endfor %}
-</div>
+<section aria-labelledby="catalog-heading">
+  <div class="section-heading"><h2 id="catalog-heading">Новая заявка</h2></div>
+  <div class="surface request-list">
+    {% for kind, (title, description, glyph) in request_types.items() %}
+    <a class="request-row catalog-row" href="{{ url_for('request_new', kind=kind) }}">
+      <span class="tile-icon">{{ icon(glyph, 21) }}</span>
+      <span class="row-copy"><strong>{{ title }}</strong><small>{{ description }}</small></span>
+      <span class="row-arrow">{{ icon('chevron', 16) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
 <section class="content-stack"><div class="section-heading"><h2>Мои заявки</h2></div>
   <div class="surface request-list">
   {% for item in items %}{{ request_row(item, fmt_dt) }}{% else %}<p class="empty">На этой странице заявок нет.</p>{% endfor %}

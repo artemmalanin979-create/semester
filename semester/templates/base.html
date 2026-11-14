@@ -1,10 +1,11 @@
-{% from 'components.html' import icon, mark, csrf_field %}
+{% from 'components.html' import icon, mark %}
 <!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6f2">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191b1f" media="(prefers-color-scheme: dark)">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Семестр{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='portal.css') }}">
@@ -14,7 +15,7 @@
   <a class="skip-link" href="#content">К содержимому</a>
   {% if g.student %}
   <aside class="sidebar">
-    <a class="brand" href="{{ url_for('home') }}">{{ mark() }}<span>Семестр<small>Студенческий кабинет</small></span></a>
+    <a class="brand" href="{{ url_for('home') }}">{{ mark() }}<span>Семестр</span></a>
     <nav class="side-nav" aria-label="Разделы кабинета">
       {% for endpoint, glyph, label in nav %}
       <a class="nav-link{% if active == endpoint %} selected{% endif %}" href="{{ url_for(endpoint) }}"{% if active == endpoint %} aria-current="page"{% endif %}>
@@ -23,7 +24,6 @@
       {% endfor %}
     </nav>
     <div class="sidebar-bottom">
-      <p>Конкурсный прототип<br><span>МГИМО × AI-CHALLENGE</span></p>
       <a class="account{% if active == 'profile' %} selected{% endif %}" href="{{ url_for('profile') }}" aria-label="Профиль">
         <span class="avatar">{{ g.student.name.split()[0][0] }}{{ g.student.name.split()[1][0] }}</span>
         <span class="row-copy"><strong>{{ g.student.name }}</strong><small>{{ g.student.student_group }}</small></span>{{ icon('chevron', 15) }}
@@ -32,9 +32,7 @@
   </aside>
   <header class="topbar">
     <a class="brand mobile-brand" href="{{ url_for('home') }}">{{ mark() }}<span>Семестр</span></a>
-    <span class="topbar-label">Студенческий кабинет</span>
     <div class="topbar-tools">
-      <a class="icon-button bell-button" href="{{ url_for('notifications') }}" aria-label="Уведомления{% if unread_count %}, непрочитанных {{ unread_count }}{% endif %}">{{ icon('bell', 20) }}{% if unread_count %}<i></i>{% endif %}</a>
       <a class="avatar top-avatar" href="{{ url_for('profile') }}" aria-label="Профиль">{{ g.student.name.split()[0][0] }}{{ g.student.name.split()[1][0] }}</a>
     </div>
   </header>
@@ -44,7 +42,7 @@
       {% for message in messages %}<p class="flash" role="status">{{ icon('check', 18) }}{{ message }}</p>{% endfor %}
     {% endwith %}
     {% block content %}{% endblock %}
-    {% if g.student %}<footer class="app-footer">Семестр · Конкурсный прототип · Вымышленные данные</footer>{% endif %}
+    {% if g.student %}<footer class="app-footer">Конкурсный прототип МГИМО × AI-CHALLENGE. Вымышленные данные.</footer>{% endif %}
   </main>
   {% if g.student %}
   <nav class="bottom-nav" aria-label="Разделы кабинета">

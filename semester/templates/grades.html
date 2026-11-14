@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pageheading, pill %}
+{% from 'components.html' import pageheading, pill %}
 {% block title %}Успеваемость · Семестр{% endblock %}
 {% block content %}
 {{ pageheading('Успеваемость', 'Осенний семестр · ' ~ g.student.student_group) }}
-<div class="grade-overview">
-  <section class="surface stat"><span class="tile-icon">{{ icon('chart', 21) }}</span><p>Средняя оценка</p><strong>{{ average }}<small> / 5</small></strong><span>По выставленным оценкам</span></section>
-  <section class="surface stat"><span class="tile-icon">{{ icon('check', 21) }}</span><p>Закрыто дисциплин</p><strong>{{ completed }}<small> / {{ records|length }}</small></strong><progress value="{{ completed }}" max="{{ records|length }}" aria-label="Закрыто дисциплин"></progress></section>
-  <section class="surface stat"><span class="tile-icon">{{ icon('calendar', 21) }}</span><p>Предстоит на сессии</p><strong>{{ upcoming|length }}</strong><span>{{ ('Ближайшая дата — ' ~ fmt_date(upcoming[0].date)) if upcoming else 'Сессия закрыта' }}</span></section>
-</div>
+<dl class="surface grade-overview" aria-label="Итоги семестра">
+  <div class="stat"><dt>Средняя оценка</dt><dd>{{ average }}<small> из 5</small></dd></div>
+  <div class="stat"><dt>Закрыто дисциплин</dt><dd>{{ completed }}<small> из {{ records|length }}</small></dd></div>
+  <div class="stat"><dt>Предстоит на сессии</dt><dd>{{ upcoming|length }}</dd></div>
+</dl>
 <div class="content-stack">
   <section aria-labelledby="results-heading"><div class="section-heading"><h2 id="results-heading">Дисциплины</h2></div>
     <div class="surface result-list">{% for row in records %}

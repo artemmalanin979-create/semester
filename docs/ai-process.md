@@ -14,7 +14,7 @@ Codex связал расписание, уведомления и заявки 
 
 > Create one ultra-wide crop-friendly editorial architectural photograph for the web UI of a fictional Russian university student portal named Семестр. No text, signage, marks, typography, people or vehicles. One striking modernist university building in pale grey weathered concrete, sculptural large repeating fins and a high elevated walkway, photographed from low viewpoint with geometric strong diagonals and depth. Place the clearly defined architecture on the right two thirds, keep leftmost third simple and quite dark. Cool petrol teal sky and evening slate shadows, small hints of warm interior windows, controlled restrained editorial color grade. Photorealistic high-end architecture portfolio photography with genuine texture. Keep the right half readable when cropped into a square and leave breathing room on top. Landscape 3:2. No official university architecture, no landmark reproduction.
 
-Сгенерированное изображение сохранено в WebP без EXIF. Один кадр использован в двух пропорциях, с затемнением под текст.
+Сгенерированное изображение сохранено в WebP без EXIF. На ранней версии кадр использовался на главной и на входе. После визуального отзыва участника кадр сняли из интерфейса. Он показывает ход работы в PDF.
 
 ## Независимое ревью
 
@@ -27,3 +27,11 @@ Codex связал расписание, уведомления и заявки 
 ## Ручные этапы
 
 Участник выбрал конкурсное задание и определил приоритет. Codex оформил проект и выполнил проверки. Перед подачей капитан добавляет опубликованные URL и созданные для жюри пароли.
+
+## Визуальная итерация
+
+Участник: «Хорошо, но frontend так себе, я думаю стоит вспомнить тебе наш фирменный стиль и правила против нейрослопа».
+
+Требования из общей дизайн-памяти пользователя: сдержанность Revolut + GNOME Adwaita, один акцент, тонкие разделители, плоские поверхности и минимум визуального хрома. Перепроверены материалы по личному кабинету TeMath.
+
+Время, аудитория и переход к занятию заменили фото на главной. Плашки услуг заменены строками, панель метрик собрана из одного списка определений. Вход упростили до формы и обозначения конкурсного статуса. Добавили тему по системной настройке и завели общие цветовые токены.

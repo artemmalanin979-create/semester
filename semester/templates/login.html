@@ -3,26 +3,25 @@
 {% block title %}Вход · Семестр{% endblock %}
 {% block content %}
 <div class="login-layout">
-  <section class="login-body">
-    <a class="brand" href="{{ url_for('login') }}">{{ mark() }}<span>Семестр<small>Студенческий кабинет</small></span></a>
-    <div class="login-form">
-      <h1>Вход в кабинет</h1>
-      <p class="lede">Введите почту и пароль тестового аккаунта.</p>
-      <form method="post">
-        {{ csrf_field(csrf) }}
-        {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
-        <label for="email">Почта</label>
-        <input type="email" id="email" name="email" value="{{ email }}" placeholder="name@demo.example" autocomplete="username" maxlength="254" required>
-        <label for="password">Пароль</label>
-        <div class="password-input">
-          <input type="password" id="password" name="password" placeholder="Введите пароль" autocomplete="current-password" maxlength="256" required>
-          <button type="button" class="password-toggle" data-password-toggle hidden aria-controls="password">Показать</button>
-        </div>
-        <button type="submit" class="button primary">Войти {{ icon('arrow', 18) }}</button>
-      </form>
-    </div>
-    <p class="login-footer">Конкурсный прототип МГИМО × AI-CHALLENGE. Все данные вымышлены.</p>
+  <header class="login-header">
+    <a class="brand" href="{{ url_for('login') }}">{{ mark() }}<span>Семестр</span></a>
+  </header>
+  <section class="login-form">
+    <h1>Вход в кабинет</h1>
+    <p class="lede">Войдите с тестовым аккаунтом студента.</p>
+    <form method="post">
+      {{ csrf_field(csrf) }}
+      {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+      <label for="email">Почта</label>
+      <input type="email" id="email" name="email" value="{{ email }}" placeholder="name@demo.example" autocomplete="username" maxlength="254" required>
+      <label for="password">Пароль</label>
+      <div class="password-input">
+        <input type="password" id="password" name="password" autocomplete="current-password" maxlength="256" required>
+        <button type="button" class="password-toggle" data-password-toggle hidden aria-controls="password">Показать</button>
+      </div>
+      <button type="submit" class="button primary">Войти</button>
+    </form>
   </section>
-  <div class="login-visual" aria-hidden="true"><span>Расписание, оценки и справки</span><p>Ваш учебный<br>день в одном<br>кабинете.</p></div>
+  <footer class="login-footer">Конкурсный прототип МГИМО × AI-CHALLENGE. Все данные вымышлены.</footer>
 </div>
 {% endblock %}
