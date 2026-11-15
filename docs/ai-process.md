@@ -6,32 +6,30 @@
 
 «Кстати важно взять первое место - поэтому помаксимум добивай по критериям».
 
-Codex связал расписание, уведомления и заявки через действия на главной, выбрал Flask с SQLite, сделал два тестовых профиля и собрал браузерные проверки.
+На первом этапе связали расписание, уведомления и заявки через действия на главной, выбрали связку Flask + SQLite (WAL), подготовили два изолированных демо-профиля и полный набор серверных и браузерных проверок.
 
-## ImageGen
+## Глубокая переработка визуальной айдентики и UX
 
-Точный отправленный промпт:
+Запрос участника на полную пересборку интерфейса:
 
-> Create one ultra-wide crop-friendly editorial architectural photograph for the web UI of a fictional Russian university student portal named Семестр. No text, signage, marks, typography, people or vehicles. One striking modernist university building in pale grey weathered concrete, sculptural large repeating fins and a high elevated walkway, photographed from low viewpoint with geometric strong diagonals and depth. Place the clearly defined architecture on the right two thirds, keep leftmost third simple and quite dark. Cool petrol teal sky and evening slate shadows, small hints of warm interior windows, controlled restrained editorial color grade. Photorealistic high-end architecture portfolio photography with genuine texture. Keep the right half readable when cropped into a square and leave breathing room on top. Landscape 3:2. No official university architecture, no landmark reproduction.
+> «Мне вообще не нравится текущий дизайн, а я считаю это самая главная часть этой задачи — именно поэтому твоей задачей будет найти интересные фирменные стили, посмотреть лучшие сайты и подобные порталы и сделать просто потрясающий сайт».
 
-Сгенерированное изображение сохранено в WebP без EXIF. На ранней версии кадр использовался на главной и на входе. После визуального отзыва участника кадр сняли из интерфейса. Он показывает ход работы в PDF.
+Что было исследовано и внедрено:
+- Проведён разбор визуальных систем современных финтех- и календарных продуктов (Wise Design System, Revolut, Cal.com, Amie) и университетских экосистем.
+- Собрана авторская дизайн-система **«Семестр»** в эстетике *Nordic Botanical Campus × Fintech Precision*: известняковый фон (`#F1F3EF`), белые модули с тонкими границами (`#DBE2D9`), акцентные карточки глубокого хвойного оттенка (`#0D261E`) с ботаническим лаймом (`#A8F07A`) и тёплой медью (`#8F420B`) строго для переносов аудиторий и статусов в обработке.
+- Выбрана выразительная типографическая пара: геометрический гротеск `Onest` Variable + моноширинный `JetBrains Mono` Variable (`tabular-nums`) для времени пар, кодов аудиторий, 100-балльного рейтинга, номеров заявок и живого таймера готовности.
+- Подключён контурный набор `Tabler Icons` (MIT), добавлены ручной переключатель светлой/тёмной темы, командная палитра быстрого поиска (`⌘K`), полноценная многоколоночная сетка недели на десктопе, экспорт расписания в `.ics`, 100-балльный академический рейтинг и электронный пропуск кампуса «Семестр ID» с матричным QR-кодом.
 
-## Независимое ревью
+## Генерация архитектурных иллюстраций
 
-Фрагмент постановки задачи субагенту:
+Для двух разных контекстов сгенерированы две независимые архитектурные фотографии без текста, логотипов и людей (каждая используется строго один раз):
 
-> Независимое read-only ревью конкурсного прототипа «Семестр» […] Проверь стабильный git diff 636da23..cd5aa96. Фокус на security/auth/IDOR, SQLite transactions/перезапуск, требования задания ко всем страницам, мобильные дефекты из кода. Обязательное ядро: вход, профиль ФИО факультет направление курс группа, сегодня/неделя с переносами, оценки/зачеты/сессия, справки и заявления со статусом, новости и напоминания.
+1. Экран входа (`login-atrium.webp`):
+> Photorealistic architectural photography of a sunlit contemporary university atrium in Moscow autumn morning light, limestone columns, warm European oak timber slatted ceiling, tall slender dark bronze glass mullions overlooking a quiet courtyard with pine and birch trees, restrained editorial color grade, 3:4 portrait, no people, no text, no signage.
 
-Ревьюер воспроизвёл ошибку одновременного переключения SQLite в WAL на холодном старте, а также пересчёт дат экзаменов сразу после дедлайна приёма работ. Исправления проверены холодными запусками и тестом, сравнивающим календарь 22 и 28 ноября. Добавлены ротация тестовых паролей и проверка прямого доступа к готовому документу из другого кабинета.
+2. Карточка читального зала в профиле (`campus-library.webp`):
+> Minimalist modern university study library interior, long solid natural oak tables with matte dark forest-green task lamps, floor-to-ceiling window overlooking autumn pine trees, warm architectural limestone walls, calm Scandinavian academic atmosphere, 16:9 landscape architectural photograph, no people, no text, no logos.
 
-## Ручные этапы
+## Независимое ревью и безопасность
 
-Участник выбрал конкурсное задание и определил приоритет. Codex оформил проект и выполнил проверки. Перед подачей капитан добавляет опубликованные URL и созданные для жюри пароли.
-
-## Визуальная итерация
-
-Участник: «Хорошо, но frontend так себе, я думаю стоит вспомнить тебе наш фирменный стиль и правила против нейрослопа».
-
-Требования из общей дизайн-памяти пользователя: сдержанность Revolut + GNOME Adwaita, один акцент, тонкие разделители, плоские поверхности и минимум визуального хрома. Перепроверены материалы по личному кабинету TeMath.
-
-Время, аудитория и переход к занятию заменили фото на главной. Плашки услуг заменены строками, панель метрик собрана из одного списка определений. Вход упростили до формы и обозначения конкурсного статуса. Добавили тему по системной настройке и завели общие цветовые токены.
+Проверены конкурентный холодный старт SQLite в режиме WAL, стабильность дат экзаменационной сессии на всём протяжении работы жюри (22–28 ноября 2026), строгий `Content-Security-Policy: default-src 'self'` (ноль inline-стилей и inline-скриптов), защита CSRF и изоляция владельца (`404` при прямом обращении к чужой заявке или готовому документу).
