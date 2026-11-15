@@ -1,17 +1,73 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, csrf_field, pageheading %}
+{% from 'components.html' import icon, csrf_field, pageheading, qr_code %}
 {% block title %}Профиль · Семестр{% endblock %}
 {% block content %}
-{{ pageheading('Профиль', 'Учебные данные тестового аккаунта.') }}
-<section class="surface detail-panel profile-panel">
-  <div class="profile-head"><span class="avatar big">{{ g.student.name.split()[0][0] }}{{ g.student.name.split()[1][0] }}</span><div><h2>{{ g.student.name }}</h2><p>{{ g.student.email }}</p></div></div>
-  <dl class="profile-fields">
-    <div><dt>ФИО</dt><dd>{{ g.student.full_name }}</dd></div>
-    <div><dt>Факультет</dt><dd>{{ g.student.faculty }}</dd></div>
-    <div><dt>Направление</dt><dd>{{ g.student.program }}</dd></div>
-    <div><dt>Курс</dt><dd>{{ g.student.course }}</dd></div>
-    <div><dt>Группа</dt><dd>{{ g.student.student_group }}</dd></div>
-  </dl>
-  <form method="post" action="{{ url_for('logout') }}">{{ csrf_field(csrf) }}<button class="button secondary">{{ icon('logout', 18) }} Выйти из кабинета</button></form>
-</section>
+{{ pageheading('Профиль и кампус', 'Учебная карточка студента, электронный пропуск и пространства кампуса.', 'Личное дело · Демо-контур') }}
+
+<div class="profile-grid">
+  <section class="surface detail-panel profile-panel" aria-labelledby="dossier-heading">
+    <div class="profile-head">
+      <span class="avatar big">{{ g.student.name.split()[0][0] }}{{ g.student.name.split()[1][0] }}</span>
+      <div class="profile-head-copy">
+        <h2 id="dossier-heading">{{ g.student.name }}</h2>
+        <p>{{ g.student.email }} · <span class="mono-id">{{ student_meta.card_number }}</span></p>
+      </div>
+    </div>
+
+    <dl class="profile-fields">
+      <div><dt>ФИО</dt><dd>{{ g.student.full_name }}</dd></div>
+      <div><dt>Факультет</dt><dd>{{ g.student.faculty }}</dd></div>
+      <div><dt>Направление</dt><dd>{{ g.student.program }}</dd></div>
+      <div><dt>Курс и группа</dt><dd>{{ g.student.course }} курс · <span class="mono-id">{{ g.student.student_group }}</span></dd></div>
+      <div><dt>Форма обучения</dt><dd>{{ student_meta.degree }} ({{ student_meta.funding|lower }})</dd></div>
+      <div><dt>Иностранные языки</dt><dd>{{ student_meta.languages }}</dd></div>
+      <div><dt>Куратор курса</dt><dd>{{ student_meta.advisor }}</dd></div>
+      <div><dt>Текущий рейтинг</dt><dd class="mono-id">{{ snap.rating_avg }} / 100 · ECTS {{ snap.rating_letter }} ({{ snap.earned_credits }} ЗЕТ)</dd></div>
+    </dl>
+
+    <div class="profile-actions">
+      <form method="post" action="{{ url_for('logout') }}">
+        {{ csrf_field(csrf) }}
+        <button type="submit" class="button secondary">{{ icon('logout', 17) }} Выйти из кабинета</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="profile-side-stack">
+    <section class="campus-pass-card" aria-labelledby="pass-card-heading">
+      <div class="pass-card-top">
+        <div>
+          <span class="pass-chip">{{ icon('shield', 14) }} Активен</span>
+          <h2 id="pass-card-heading">Семестр ID</h2>
+        </div>
+        <button type="button" class="icon-button dark-ghost" data-open-pass aria-label="Открыть QR-код на весь экран" title="На весь экран">
+          {{ icon('up-right', 17) }}
+        </button>
+      </div>
+
+      <div class="pass-card-mid">
+        <div class="pass-card-meta">
+          <small>Студенческий пропуск</small>
+          <strong class="mono-id">{{ student_meta.card_number }}</strong>
+          <p>{{ student_meta.pass_zone }}</p>
+          <span class="pass-valid">Действителен до {{ student_meta.pass_valid }}</span>
+        </div>
+        <div class="pass-card-qr">
+          {{ qr_code(pass_qr, 92) }}
+        </div>
+      </div>
+    </section>
+
+    <section class="surface commons-card" aria-labelledby="commons-heading">
+      <div class="commons-photo">
+        <img src="{{ url_for('static', filename='campus-library.webp') }}" alt="Современный читальный зал кампуса с дубовыми столами и зелёными лампами" width="960" height="540" loading="lazy">
+        <span class="commons-badge">Корпус А · 2 этаж · Открыто до 21:00</span>
+      </div>
+      <div class="commons-body">
+        <h3 id="commons-heading">Читальный зал и коворкинг</h3>
+        <p>Доступ по пропуску Семестр ID между парами. Тихая зона, переговорные боксы для групповых проектов и окно деканата А–116 этажом ниже.</p>
+      </div>
+    </section>
+  </div>
+</div>
 {% endblock %}

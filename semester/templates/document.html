@@ -1,13 +1,89 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon %}
-{% block title %}Документ · Семестр{% endblock %}
+{% from 'components.html' import icon, mark, qr_code %}
+{% block title %}{{ item.title }} · Документ · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link no-print" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('left', 18) }} К заявке</a>
-<article class="surface detail-panel document-panel">
-  <p class="document-label">Демонстрационный образец</p><h1>{{ item.title }}</h1>
-  <p>{{ g.student.full_name }} учится на {{ g.student.course }} курсе по направлению «{{ g.student.program }}» в группе {{ g.student.student_group }}.</p>
-  {% if records %}<dl class="profile-fields">{% for row in records %}<div><dt>{{ row.title }}</dt><dd>{{ row.result or 'Ожидается' }}</dd></div>{% endfor %}</dl>{% endif %}
-  <p class="form-hint">Документ создан в конкурсном прототипе на вымышленных данных и не имеет юридической силы.</p>
-  <button type="button" class="button secondary no-print" data-print hidden>{{ icon('print', 18) }} Распечатать или сохранить PDF</button>
+<div class="doc-toolbar no-print">
+  <a class="text-link back-link" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('left', 17) }} К заявке</a>
+  <button type="button" class="button primary compact" data-print hidden>{{ icon('print', 17) }} Распечатать или сохранить PDF</button>
+</div>
+
+<article class="surface document-sheet">
+  <header class="doc-letterhead">
+    <div class="doc-org">
+      {{ mark() }}
+      <div>
+        <strong>Цифровой деканат «Семестр»</strong>
+        <span>Учебный контур демонстрационного кампуса</span>
+      </div>
+    </div>
+    <div class="doc-meta-box">
+      <span>Демонстрационный образец</span>
+      <b class="mono-id">Исх. № {{ verify_code }}</b>
+      <small>от {{ fmt_dt(item.ready_at) }}</small>
+    </div>
+  </header>
+
+  <div class="doc-body">
+    <p class="eyebrow">Официальная форма прототипа</p>
+    <h1>{{ item.title }}</h1>
+
+    <p class="doc-statement">
+      Подтверждается, что <strong>{{ g.student.full_name }}</strong> является обучающимся {{ g.student.course }} курса очной формы обучения
+      подразделения «{{ g.student.faculty }}» по направлению подготовки «{{ g.student.program }}», учебная группа <strong class="mono-id">{{ g.student.student_group }}</strong>
+      (студенческий билет <span class="mono-id">{{ student_meta.card_number }}</span>).
+    </p>
+
+    {% if records %}
+    <div class="doc-table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th scope="col">Дисциплина</th>
+            <th scope="col">Контроль</th>
+            <th scope="col">ЗЕТ</th>
+            <th scope="col">Рейтинг</th>
+            <th scope="col">Результат</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in records %}
+          <tr>
+            <td>{{ row.title }}</td>
+            <td>{{ row.kind }}</td>
+            <td class="mono-id">{{ row.credits }}</td>
+            <td class="mono-id">{{ row.score }} / 100 ({{ row.ects }})</td>
+            <td><strong>{{ row.result or 'Сессия (' ~ fmt_date(row.date) ~ ')' }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <dl class="doc-kv-grid">
+      <div><dt>Форма и основа</dt><dd>{{ student_meta.degree }} · {{ student_meta.funding|lower }}</dd></div>
+      <div><dt>Языковая подготовка</dt><dd>{{ student_meta.languages }}</dd></div>
+      <div><dt>Нормативный срок</dt><dd>До {{ student_meta.pass_valid }}</dd></div>
+      <div><dt>Назначение справки</dt><dd>{{ item.comment or 'По месту требования' }}</dd></div>
+    </dl>
+    {% endif %}
+  </div>
+
+  <footer class="doc-verification">
+    <div class="doc-stamp">
+      <div class="stamp-badge">
+        {{ icon('shield', 18) }}
+        <div>
+          <strong>Электронная отметка реестра «Семестр»</strong>
+          <small class="mono-id">Код проверки: {{ verify_code }} · Владелец ID {{ g.student.id }}</small>
+        </div>
+      </div>
+      <p class="doc-disclaimer">
+        Документ сформирован автоматически в конкурсном прототипе МГИМО × AI-CHALLENGE на вымышленных данных и не имеет юридической силы.
+      </p>
+    </div>
+    <div class="doc-qr">
+      {{ qr_code(doc_qr, 84) }}
+    </div>
+  </footer>
 </article>
 {% endblock %}

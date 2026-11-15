@@ -2,5 +2,11 @@
 {% from 'components.html' import icon %}
 {% block title %}{{ title }} · Семестр{% endblock %}
 {% block content %}
-<section class="surface detail-panel error-panel"><span class="tile-icon">{{ icon('info', 23) }}</span><h1>{{ title }}</h1><p>{{ message }}</p><a class="button primary" href="{{ url_for('home' if g.student else 'login') }}">В кабинет {{ icon('arrow', 17) }}</a></section>
+<section class="surface detail-panel error-panel">
+  <span class="tile-icon tone-amber">{{ icon('info', 22) }}</span>
+  <p class="mono-id error-code">Код ответа {{ status }}</p>
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  <a class="button primary" href="{{ url_for('home' if g.student else 'login') }}">В кабинет {{ icon('arrow', 17) }}</a>
+</section>
 {% endblock %}

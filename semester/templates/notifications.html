@@ -2,19 +2,51 @@
 {% from 'components.html' import icon, csrf_field, pageheading, pill %}
 {% block title %}Уведомления · Семестр{% endblock %}
 {% block content %}
-{{ pageheading('Уведомления', 'Переносы занятий, учебные сроки и объявления деканата.') }}
+{% call pageheading('Центр уведомлений', 'Переносы аудиторий, рубежи сессии, готовность справок и объявления деканата.', 'События кабинета') %}
+  {% if unread_count %}
+  <form method="post" action="{{ url_for('notifications_read') }}">
+    {{ csrf_field(csrf) }}
+    <button type="submit" class="button secondary compact" name="notice_id" value="all">
+      {{ icon('checks', 17) }}<span>Прочитать все ({{ unread_count }})</span>
+    </button>
+  </form>
+  {% endif %}
+{% endcall %}
+
 <div class="section-heading">
-  <h2>Входящие {{ pill(unread_count, 'green') if unread_count else '' }}</h2>
-  {% if unread_count %}<form method="post" action="{{ url_for('notifications_read') }}">{{ csrf_field(csrf) }}<button class="text-link" name="notice_id" value="all">Прочитать все {{ icon('check', 16) }}</button></form>{% endif %}
+  <h2>Входящие {% if unread_count %}{{ pill(unread_count ~ ' новых', 'green') }}{% endif %}</h2>
+  <div class="filter-pills" data-notice-filters hidden role="tablist" aria-label="Категории уведомлений">
+    <button type="button" class="filter-pill active" data-notice-filter="all">Все</button>
+    <button type="button" class="filter-pill" data-notice-filter="unread">Непрочитанные</button>
+    <button type="button" class="filter-pill" data-notice-filter="Расписание">Расписание</button>
+    <button type="button" class="filter-pill" data-notice-filter="Сессия">Сессия</button>
+    <button type="button" class="filter-pill" data-notice-filter="Заявки">Заявки</button>
+  </div>
 </div>
+
 <section class="surface notices" aria-label="Входящие">
   {% for item in items %}
-  <a class="notice-row" href="{{ url_for('notification_detail', notice_id=item.id) }}"{% if item.unread %} data-unread="{{ item.id }}"{% endif %}>
-    <span class="tile-icon {{ 'warm' if item.old_room else '' }}">{{ icon(item.icon, 20) }}</span>
-    <span class="row-copy"><small>{{ item.kind }} · {{ fmt_date(item.date) }}{% if item.unread %}<span class="unread-dot" aria-label="Новое"></span>{% endif %}</small>
-    <strong>{{ item.title }}</strong><span class="notice-body">{{ item.body }}</span></span>
-    {{ icon('chevron', 18) }}
+  <a class="notice-row{% if item.unread %} is-unread{% endif %}"
+     href="{{ url_for('notification_detail', notice_id=item.id) }}"
+     data-notice-kind="{{ item.kind }}"
+     {% if item.unread %}data-unread="{{ item.id }}"{% endif %}>
+    <span class="tile-icon{% if item.old_room %} tone-amber{% elif item.unread %} tone-emerald{% endif %}">
+      {{ icon(item.icon, 19) }}
+    </span>
+    <span class="row-copy">
+      <small class="notice-meta">
+        <span class="notice-cat">{{ item.kind }}</span>
+        <span class="word-dot"></span>
+        <span>{{ fmt_date(item.date) }}</span>
+        {% if item.unread %}<span class="unread-dot" aria-label="Новое"></span>{% endif %}
+      </small>
+      <strong>{{ item.title }}</strong>
+      <span class="notice-body">{{ item.body }}</span>
+    </span>
+    <span class="row-arrow">{{ icon('chevron', 17) }}</span>
   </a>
-  {% else %}<p class="empty">Уведомлений пока нет.</p>{% endfor %}
+  {% else %}
+  <p class="empty">Уведомлений пока нет.</p>
+  {% endfor %}
 </section>
 {% endblock %}

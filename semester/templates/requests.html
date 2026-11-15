@@ -1,27 +1,55 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pageheading, request_row %}
+{% from 'components.html' import icon, pageheading, request_row, pill %}
 {% block title %}Заявки · Семестр{% endblock %}
 {% block content %}
-{{ pageheading('Заявки и справки', 'Закажите документ, подайте заявление или проверьте статус.') }}
+{{ pageheading('Заявки и справки', 'Закажите электронный документ с проверочным кодом, оригинал в окно А–116 или направьте обращение методисту.', 'Сервисный центр деканата') }}
+
 <section aria-labelledby="catalog-heading">
-  <div class="section-heading"><h2 id="catalog-heading">Новая заявка</h2></div>
-  <div class="surface request-list">
+  <div class="section-heading">
+    <div>
+      <h2 id="catalog-heading">Новая заявка</h2>
+      <p>Выберите тип документа или обращения</p>
+    </div>
+  </div>
+  <div class="catalog-grid">
     {% for kind, (title, description, glyph) in request_types.items() %}
-    <a class="request-row catalog-row" href="{{ url_for('request_new', kind=kind) }}">
-      <span class="tile-icon">{{ icon(glyph, 21) }}</span>
-      <span class="row-copy"><strong>{{ title }}</strong><small>{{ description }}</small></span>
-      <span class="row-arrow">{{ icon('chevron', 16) }}</span>
+    <a class="surface catalog-card" href="{{ url_for('request_new', kind=kind) }}">
+      <div class="catalog-card-top">
+        <span class="tile-icon tone-emerald">{{ icon(glyph, 21) }}</span>
+        <span class="mono-chip">{{ 'Ответ деканата' if kind == 'appeal' else '~2 мин · Онлайн' }}</span>
+      </div>
+      <div class="catalog-card-body">
+        <strong>{{ title }}</strong>
+        <p>{{ description }}</p>
+      </div>
+      <div class="catalog-card-foot">
+        <span>{{ 'Свободная форма' if kind == 'appeal' else 'Электронно или в А–116' }}</span>
+        <span class="row-arrow">{{ icon('arrow', 16) }}</span>
+      </div>
     </a>
     {% endfor %}
   </div>
 </section>
-<section class="content-stack"><div class="section-heading"><h2>Мои заявки</h2></div>
-  <div class="surface request-list">
-  {% for item in items %}{{ request_row(item, fmt_dt) }}{% else %}<p class="empty">На этой странице заявок нет.</p>{% endfor %}
+
+<section class="content-stack" aria-labelledby="history-heading">
+  <div class="section-heading">
+    <div>
+      <h2 id="history-heading">Мои заявки</h2>
+      <p>История выпущенных справок и поданных заявлений</p>
+    </div>
   </div>
-  {% if page > 1 or more %}<nav class="pagination" aria-label="Страницы заявок">
-    {% if page > 1 %}<a class="button secondary" href="{{ url_for('requests_list', page=page - 1) }}">Назад</a>{% endif %}
-    {% if more %}<a class="button secondary" href="{{ url_for('requests_list', page=page + 1) }}">Дальше</a>{% endif %}
-  </nav>{% endif %}
+  <div class="surface request-list">
+    {% for item in items %}
+      {{ request_row(item, fmt_dt) }}
+    {% else %}
+      <p class="empty">На этой странице заявок пока нет.</p>
+    {% endfor %}
+  </div>
+  {% if page > 1 or more %}
+  <nav class="pagination" aria-label="Страницы заявок">
+    {% if page > 1 %}<a class="button secondary compact" href="{{ url_for('requests_list', page=page - 1) }}">{{ icon('left', 16) }} Назад</a>{% endif %}
+    {% if more %}<a class="button secondary compact" href="{{ url_for('requests_list', page=page + 1) }}">Дальше {{ icon('chevron', 16) }}</a>{% endif %}
+  </nav>
+  {% endif %}
 </section>
 {% endblock %}

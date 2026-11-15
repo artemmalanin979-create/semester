@@ -1,9 +1,9 @@
 import re
 import sqlite3
 import tempfile
+import unittest
 from contextlib import closing
 from datetime import date
-import unittest
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -37,7 +37,8 @@ class PortalTest(unittest.TestCase):
         browser = browser or self.browser
         email, expected = DEMO[account]
         return browser.post("/login", data={
-            "_csrf": token(browser.get("/login")), "email": email,
+            "_csrf": token(browser.get("/login")),
+            "email": email,
             "password": expected if password is None else password,
         })
 
@@ -45,8 +46,10 @@ class PortalTest(unittest.TestCase):
         browser = browser or self.browser
         form = browser.get("/requests/new/study")
         return browser.post("/requests/new/study", data={
-            "_csrf": token(form), "nonce": token(form, "nonce"),
-            "delivery": "digital", "comment": "Для подачи документов",
+            "_csrf": token(form),
+            "nonce": token(form, "nonce"),
+            "delivery": "digital",
+            "comment": "Для подачи документов",
         })
 
     def test_private_page_requires_login_and_logout_revokes_session(self):
@@ -54,6 +57,7 @@ class PortalTest(unittest.TestCase):
         self.assertEqual(self.login().status_code, 303)
         profile = self.browser.get("/profile")
         self.assertIn("Валерия Маякова", profile.get_data(as_text=True))
+        self.assertIn("24-МП-0184", profile.get_data(as_text=True))
         previous_cookie = self.browser.get_cookie("session").value
         self.browser.post("/logout", data={"_csrf": token(profile)})
         replay = self.app.test_client()
@@ -105,6 +109,17 @@ class PortalTest(unittest.TestCase):
         self.assertIn("Методы исследований", self.browser.get("/grades").get_data(as_text=True))
         self.assertNotIn("Методы исследований", other.get("/grades").get_data(as_text=True))
 
+    def test_schedule_ics_export_requires_auth_and_matches_student(self):
+        self.assertEqual(urlsplit(self.browser.get("/schedule.ics").location).path, "/login")
+        self.login()
+        ics = self.browser.get("/schedule.ics")
+        self.assertEqual(ics.status_code, 200)
+        self.assertIn("text/calendar", ics.headers["Content-Type"])
+        body = ics.get_data(as_text=True)
+        self.assertIn("BEGIN:VCALENDAR", body)
+        self.assertIn("Маркетинговая аналитика", body)
+        self.assertNotIn("Международная экономика", body)
+
     def test_notification_read_action_belongs_to_signed_in_account(self):
         self.login()
         other = self.app.test_client()
@@ -112,7 +127,8 @@ class PortalTest(unittest.TestCase):
         self.assertEqual(other.get("/notifications/schedule-a").status_code, 404)
         page = self.browser.get("/notifications")
         result = self.browser.post("/notifications/read", data={
-            "_csrf": token(page), "notice_id": "schedule-a",
+            "_csrf": token(page),
+            "notice_id": "schedule-a",
         })
         self.assertEqual(result.status_code, 303)
         self.assertNotIn('data-unread="schedule-a"', self.browser.get("/notifications").get_data(as_text=True))
@@ -144,11 +160,24 @@ class PortalTest(unittest.TestCase):
         self.login()
         form = self.browser.get("/requests/new/study")
         result = self.browser.post("/requests/new/study", data={
-            "_csrf": token(form), "nonce": token(form, "nonce"),
-            "delivery": "unknown", "comment": "<script>alert(1)</script>",
+            "_csrf": token(form),
+            "nonce": token(form, "nonce"),
+            "delivery": "unknown",
+            "comment": "<script>alert(1)</script>",
         })
         self.assertEqual(result.status_code, 422)
         self.assertNotIn("<script>alert(1)</script>", result.get_data(as_text=True))
+
+    def test_pages_contain_no_inline_styles_or_scripts_for_strict_csp(self):
+        login_html = self.browser.get("/login").get_data(as_text=True)
+        self.assertNotRegex(login_html, r"\sstyle=")
+        self.assertNotRegex(login_html, r"<script(?![^>]*\bsrc=)")
+        self.login()
+        for path in ("/", "/schedule", "/schedule?view=week", "/grades", "/requests",
+                     "/requests/new/study", "/notifications", "/profile"):
+            html = self.browser.get(path).get_data(as_text=True)
+            self.assertNotRegex(html, r"\sstyle=", msg=path)
+            self.assertNotRegex(html, r"<script(?![^>]*\bsrc=)", msg=path)
 
 
 if __name__ == "__main__":

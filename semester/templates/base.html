@@ -1,13 +1,14 @@
-{% from 'components.html' import icon, mark %}
+{% from 'components.html' import icon, mark, qr_code %}
 <!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#191b1f" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F1F3EF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B0F0E" media="(prefers-color-scheme: dark)">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Семестр{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='portal.css') }}">
   <script defer src="{{ url_for('static', filename='portal.js') }}"></script>
 </head>
@@ -15,35 +16,97 @@
   <a class="skip-link" href="#content">К содержимому</a>
   {% if g.student %}
   <aside class="sidebar">
-    <a class="brand" href="{{ url_for('home') }}">{{ mark() }}<span>Семестр</span></a>
+    <div class="sidebar-top">
+      <a class="brand" href="{{ url_for('home') }}">
+        {{ mark() }}
+        <span class="brand-word">
+          <strong>Семестр</strong>
+          <small>Цифровой деканат</small>
+        </span>
+      </a>
+    </div>
+
+    <div class="sidebar-week-pill">
+      <span class="pulse-dot" aria-hidden="true"></span>
+      <span>{{ week_num }} учебная неделя · МСК</span>
+    </div>
+
     <nav class="side-nav" aria-label="Разделы кабинета">
       {% for endpoint, glyph, label in nav %}
       <a class="nav-link{% if active == endpoint %} selected{% endif %}" href="{{ url_for(endpoint) }}"{% if active == endpoint %} aria-current="page"{% endif %}>
-        {{ icon(glyph, 20) }}<span>{{ label }}</span>{% if endpoint == 'notifications' and unread_count %}<i aria-label="Непрочитанные"></i>{% endif %}
+        <span class="nav-glyph">{{ icon(glyph, 19) }}</span>
+        <span class="nav-label">{{ label }}</span>
+        {% if endpoint == 'notifications' and unread_count %}
+        <span class="nav-badge" aria-label="Непрочитанных: {{ unread_count }}">{{ unread_count }}</span>
+        {% endif %}
       </a>
       {% endfor %}
     </nav>
+
     <div class="sidebar-bottom">
+      <button type="button" class="pass-mini-trigger" data-open-pass aria-label="Открыть пропуск кампуса">
+        <span class="pass-mini-icon">{{ icon('qrcode', 18) }}</span>
+        <span class="row-copy">
+          <strong>Семестр ID</strong>
+          <small class="mono-id">{{ student_meta.card_number }}</small>
+        </span>
+        <span class="pass-live-tag">Активен</span>
+      </button>
+
       <a class="account{% if active == 'profile' %} selected{% endif %}" href="{{ url_for('profile') }}" aria-label="Профиль">
         <span class="avatar">{{ g.student.name.split()[0][0] }}{{ g.student.name.split()[1][0] }}</span>
-        <span class="row-copy"><strong>{{ g.student.name }}</strong><small>{{ g.student.student_group }}</small></span>{{ icon('chevron', 15) }}
+        <span class="row-copy">
+          <strong>{{ g.student.name }}</strong>
+          <small>{{ g.student.student_group }} · {{ g.student.course }} курс</small>
+        </span>
+        {{ icon('chevron', 15) }}
       </a>
     </div>
   </aside>
+
   <header class="topbar">
-    <a class="brand mobile-brand" href="{{ url_for('home') }}">{{ mark() }}<span>Семестр</span></a>
+    <a class="brand mobile-brand" href="{{ url_for('home') }}">
+      {{ mark() }}
+      <span>Семестр</span>
+    </a>
+
+    <button type="button" class="cmd-trigger" data-open-cmd aria-label="Быстрый поиск по кабинету">
+      {{ icon('search', 16) }}
+      <span class="cmd-trigger-text">Поиск пар, аудиторий и справок…</span>
+      <kbd class="cmd-kbd">⌘K</kbd>
+    </button>
+
     <div class="topbar-tools">
+      <button type="button" class="icon-button subtle mobile-search-btn" data-open-cmd aria-label="Поиск по кабинету" title="Поиск (⌘K)">
+        {{ icon('search', 18) }}
+      </button>
+      <button type="button" class="icon-button subtle" data-open-pass aria-label="Электронный пропуск" title="Семестр ID">
+        {{ icon('qrcode', 18) }}
+      </button>
+      <button type="button" class="icon-button subtle theme-toggle" data-theme-toggle aria-label="Переключить цветовую тему" title="Переключить тему">
+        <span class="theme-icon-sun">{{ icon('sun', 18) }}</span>
+        <span class="theme-icon-moon">{{ icon('moon', 18) }}</span>
+      </button>
       <a class="avatar top-avatar" href="{{ url_for('profile') }}" aria-label="Профиль">{{ g.student.name.split()[0][0] }}{{ g.student.name.split()[1][0] }}</a>
     </div>
   </header>
   {% endif %}
+
   <main id="content" class="{% if g.student %}app-main{% else %}public-main{% endif %}">
     {% with messages = get_flashed_messages() %}
-      {% for message in messages %}<p class="flash" role="status">{{ icon('check', 18) }}{{ message }}</p>{% endfor %}
+      {% for message in messages %}
+      <p class="flash" role="status">{{ icon('check', 18) }}<span>{{ message }}</span></p>
+      {% endfor %}
     {% endwith %}
     {% block content %}{% endblock %}
-    {% if g.student %}<footer class="app-footer">Конкурсный прототип МГИМО × AI-CHALLENGE. Вымышленные данные.</footer>{% endif %}
+    {% if g.student %}
+    <footer class="app-footer">
+      <span>Семестр · Конкурсный прототип цифрового деканата (МГИМО × AI-CHALLENGE)</span>
+      <span>Все профили, расписания и документы вымышлены и созданы для демонстрации</span>
+    </footer>
+    {% endif %}
   </main>
+
   {% if g.student %}
   <nav class="bottom-nav" aria-label="Разделы кабинета">
     {% for endpoint, glyph, label in nav %}
@@ -53,6 +116,50 @@
     </a>
     {% endfor %}
   </nav>
+
+  <dialog class="modal-dialog cmd-dialog" id="cmd-palette" aria-label="Быстрый поиск по кабинету">
+    <div class="cmd-shell">
+      <div class="cmd-header">
+        {{ icon('search', 18) }}
+        <input type="search" id="cmd-input" class="cmd-input" placeholder="Найти предмет, кабинет, преподавателя или справку…" autocomplete="off">
+        <button type="button" class="icon-button subtle" data-close-dialog aria-label="Закрыть поиск">{{ icon('close', 17) }}</button>
+      </div>
+      <div class="cmd-results" id="cmd-results">
+        {% for entry in search_index %}
+        <a class="cmd-item" href="{{ entry.url }}" data-cmd-item data-search="{{ (entry.cat ~ ' ' ~ entry.title ~ ' ' ~ entry.meta)|lower }}">
+          <span class="tile-icon subtle">{{ icon(entry.icon, 17) }}</span>
+          <span class="row-copy">
+            <strong>{{ entry.title }}</strong>
+            <small>{{ entry.meta }}</small>
+          </span>
+          <span class="cmd-cat">{{ entry.cat }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      <p class="cmd-empty" id="cmd-empty" hidden>Ничего не найдено. Попробуйте номер корпуса, фамилию или «справка».</p>
+    </div>
+  </dialog>
+
+  <dialog class="modal-dialog pass-dialog" id="pass-modal" aria-label="Электронный пропуск кампуса">
+    <div class="pass-modal-card">
+      <div class="pass-modal-top">
+        <span class="pass-chip">{{ icon('shield', 14) }} Турникеты кампуса</span>
+        <button type="button" class="icon-button dark-ghost" data-close-dialog aria-label="Закрыть пропуск">{{ icon('close', 18) }}</button>
+      </div>
+      <div class="pass-qr-frame">
+        {{ qr_code(pass_qr, 168) }}
+      </div>
+      <div class="pass-modal-meta">
+        <strong>{{ g.student.name }}</strong>
+        <p>{{ g.student.faculty }}</p>
+        <div class="pass-kv-row">
+          <div><small>Номер билета</small><b class="mono-id">{{ student_meta.card_number }}</b></div>
+          <div><small>Группа</small><b class="mono-id">{{ g.student.student_group }}</b></div>
+        </div>
+        <p class="pass-footnote">Демонстрационный пропуск прототипа · действует до {{ student_meta.pass_valid }}</p>
+      </div>
+    </div>
+  </dialog>
   {% endif %}
 </body>
 </html>

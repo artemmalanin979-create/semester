@@ -1,27 +1,120 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pageheading, lesson %}
+{% from 'components.html' import icon, pageheading, lesson, pill %}
 {% block title %}Расписание · Семестр{% endblock %}
 {% block content %}
-{{ pageheading('Расписание', 'Группа ' ~ g.student.student_group ~ ' · московское время') }}
+{% call pageheading('Расписание занятий', 'Группа ' ~ g.student.student_group ~ ' · ' ~ week_num ~ ' учебная неделя · московское время', 'Академический календарь') %}
+  <a class="button secondary compact" href="{{ url_for('schedule_ics', date=selected.isoformat()) }}" title="Скачать расписание недели в формате iCalendar">
+    {{ icon('download', 16) }}<span>Экспорт .ics</span>
+  </a>
+{% endcall %}
+
 <div class="schedule-controls surface">
-  <div class="switch"><a href="{{ url_for('schedule') }}"{% if view == 'day' and selected == today %} aria-current="page"{% endif %}>Сегодня</a><a href="{{ url_for('schedule', view='week', date=selected.isoformat()) }}"{% if view == 'week' %} aria-current="page"{% endif %}>Неделя</a></div>
-  <div class="week-control">
-    <a class="icon-button outline" href="{{ url_for('schedule', view=view, date=prev.isoformat()) }}" aria-label="Предыдущая неделя">{{ icon('left', 17) }}</a>
-    <strong>{{ fmt_date(week[0]) }} – {{ fmt_date(week[-1]) }}</strong>
-    <a class="icon-button outline" href="{{ url_for('schedule', view=view, date=next.isoformat()) }}" aria-label="Следующая неделя">{{ icon('chevron', 17) }}</a>
+  <div class="schedule-toolbar">
+    <div class="switch" role="group" aria-label="Режим расписания">
+      <a href="{{ url_for('schedule') }}"{% if view == 'day' and selected == today %} aria-current="page"{% endif %} class="{% if view == 'day' %}active{% endif %}">Сегодня</a>
+      <a href="{{ url_for('schedule', view='week', date=selected.isoformat()) }}"{% if view == 'week' %} aria-current="page"{% endif %} class="{% if view == 'week' %}active{% endif %}">Неделя</a>
+    </div>
+
+    <div class="week-control">
+      <a class="icon-button outline" href="{{ url_for('schedule', view=view, date=prev.isoformat()) }}" aria-label="Предыдущая неделя" title="Предыдущая неделя">{{ icon('left', 17) }}</a>
+      <strong class="week-range-label">{{ fmt_date(week[0]) }} – {{ fmt_date(week[-1]) }}</strong>
+      <a class="icon-button outline" href="{{ url_for('schedule', view=view, date=next.isoformat()) }}" aria-label="Следующая неделя" title="Следующая неделя">{{ icon('chevron', 17) }}</a>
+    </div>
   </div>
+
   <div class="week-days" aria-label="Дни недели">
     {% for date in week %}
-    <a class="{% if date == selected %}selected{% endif %}" href="{{ url_for('schedule', date=date.isoformat()) }}"{% if date == selected and view == 'day' %} aria-current="date"{% endif %} aria-label="{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}"><span>{{ short_day[date.weekday()] }}</span><b>{{ date.day }}</b></a>
+    {% set meta = week_meta[date.isoformat()] %}
+    <a class="day-pill{% if date == selected %} selected{% endif %}{% if date == today %} is-today{% endif %}"
+       href="{{ url_for('schedule', date=date.isoformat()) }}"
+       {% if date == selected and view == 'day' %}aria-current="date"{% endif %}
+       aria-label="{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}">
+      <span class="day-short">{{ short_day[date.weekday()] }}</span>
+      <b class="day-num">{{ date.day }}</b>
+      <span class="day-dots" aria-hidden="true">
+        {% if meta.moved %}
+          <i class="dot-moved"></i>
+        {% elif meta.count %}
+          <i class="dot-class"></i>
+        {% else %}
+          <i class="dot-empty"></i>
+        {% endif %}
+      </span>
+    </a>
     {% endfor %}
   </div>
 </div>
-<div class="schedule-days">
+
+{% if view == 'week' %}
+<section class="week-matrix-wrap surface" aria-label="Календарная сетка недели">
+  <div class="week-matrix">
+    <div class="matrix-corner">Время · МСК</div>
+    {% for d in study_days %}
+    <a class="matrix-day-head{% if d == today %} is-today{% endif %}{% if d == selected %} is-selected{% endif %}" href="{{ url_for('schedule', date=d.isoformat()) }}">
+      <span>{{ weekdays[d.weekday()] }}</span>
+      <strong>{{ fmt_date(d) }}</strong>
+    </a>
+    {% endfor %}
+
+    {% for start_t, end_t, slot_label in slots %}
+    {% set slot_idx = loop.index %}
+    <div class="matrix-time-cell">
+      <span class="slot-caption">{{ slot_label }}</span>
+      <b>{{ start_t }}</b>
+      <small>{{ end_t }}</small>
+    </div>
+    {% for d in study_days %}
+      {% set cell = grid_lookup.get((d.isoformat(), slot_idx)) %}
+      <div class="matrix-cell{% if d == today %} today-col{% endif %}">
+        {% if cell %}
+        <a class="matrix-card kind-{{ cell.kind_slug }}{% if cell.previous %} is-moved{% endif %}" href="{{ url_for('schedule', date=d.isoformat()) }}#{{ cell.id }}">
+          <div class="matrix-card-top">
+            <span class="kind-tag kind-{{ cell.kind_slug }}">{{ cell.kind }}</span>
+            {% if cell.previous %}
+            <span class="matrix-room moved"><del>{{ cell.previous }}</del> → {{ cell.room }}</span>
+            {% else %}
+            <span class="matrix-room">{{ cell.room }}</span>
+            {% endif %}
+          </div>
+          <h3>{{ cell.title }}</h3>
+          <p class="matrix-teacher">{{ cell.teacher }}</p>
+          <span class="matrix-wing">{{ cell.wing }} · {{ cell.floor }}</span>
+        </a>
+        {% else %}
+        <div class="matrix-empty" aria-hidden="true"><span>Окно</span></div>
+        {% endif %}
+      </div>
+    {% endfor %}
+    {% endfor %}
+  </div>
+  <div class="matrix-weekend-bar">
+    <span>{{ icon('calendar', 15) }} Суббота ({{ fmt_date(week[5]) }}) и воскресенье ({{ fmt_date(week[6]) }}) — дни самостоятельной подготовки, аудиторных пар нет.</span>
+    <span class="matrix-legend">
+      <span><i class="legend-swatch lecture"></i>Лекция</span>
+      <span><i class="legend-swatch seminar"></i>Семинар</span>
+      <span><i class="legend-swatch lab"></i>Практика</span>
+      <span><i class="legend-swatch moved"></i>Перенос аудитории</span>
+    </span>
+  </div>
+</section>
+{% endif %}
+
+<div class="schedule-days{% if view == 'week' %} week-mobile-stack{% endif %}">
   {% for date, lessons in days %}
   <section class="schedule-day" aria-label="{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}">
-    <div class="section-heading"><h2>{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}</h2>{% if date == today %}<span class="pill green">Сегодня</span>{% endif %}</div>
+    <div class="section-heading">
+      <div>
+        <h2>{{ weekdays[date.weekday()] }}, {{ fmt_date(date) }}</h2>
+        {% if lessons %}<p>{{ lessons|length }} {{ 'пара' if lessons|length == 1 else ('пары' if lessons|length < 5 else 'пар') }} · корпуса и маршруты</p>{% endif %}
+      </div>
+      {% if date == today %}{{ pill('Сегодня', 'green') }}{% endif %}
+    </div>
     <div class="surface lesson-list">
-      {% for item in lessons %}{{ lesson(item) }}{% else %}<p class="empty">{{ icon('calendar', 22) }} Занятий нет.</p>{% endfor %}
+      {% for item in lessons %}
+        {{ lesson(item, gaps.get(item.id) if view == 'day' else None) }}
+      {% else %}
+        <p class="empty">{{ icon('calendar', 20) }}<span>Свободный от пар день — время для проектной работы или библиотеки.</span></p>
+      {% endfor %}
     </div>
   </section>
   {% endfor %}

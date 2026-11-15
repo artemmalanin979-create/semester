@@ -1,12 +1,33 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, csrf_field, pageheading %}
+{% from 'components.html' import icon, csrf_field, pageheading, pill %}
 {% block title %}{{ item.title }} · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link" href="{{ url_for('notifications') }}">{{ icon('left', 18) }} Все уведомления</a>
-{{ pageheading(item.title, item.kind ~ ' · ' ~ fmt_date(item.date)) }}
-<article class="surface detail-panel"><p class="notice-detail-body">{{ item.body }}</p>
-<div class="notice-actions">
-  <a class="button primary" href="{{ item.link }}">{{ item.action }} {{ icon('arrow', 17) }}</a>
-  {% if item.unread %}<form method="post" action="{{ url_for('notifications_read') }}">{{ csrf_field(csrf) }}<button class="button secondary" name="notice_id" value="{{ item.id }}">{{ icon('check', 17) }} Отметить прочитанным</button></form>{% endif %}
-</div></article>
+<a class="text-link back-link" href="{{ url_for('notifications') }}">{{ icon('left', 17) }} Все уведомления</a>
+{{ pageheading(item.title, fmt_date(item.date), item.kind) }}
+
+<article class="surface detail-panel notice-detail-card">
+  {% if item.old_room %}
+  <div class="transfer-banner">
+    <span class="tile-icon tone-amber">{{ icon('arrow-swap', 20) }}</span>
+    <div>
+      <small>Изменение аудитории в расписании</small>
+      <div class="room-change large"><del>{{ item.old_room }}</del>{{ icon('arrow', 15) }}<b>{{ item.new_room }}</b></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <p class="notice-detail-body">{{ item.body }}</p>
+
+  <div class="notice-actions">
+    <a class="button primary" href="{{ item.link }}">{{ item.action }} {{ icon('arrow', 17) }}</a>
+    {% if item.unread %}
+    <form method="post" action="{{ url_for('notifications_read') }}">
+      {{ csrf_field(csrf) }}
+      <button type="submit" class="button secondary" name="notice_id" value="{{ item.id }}">
+        {{ icon('check', 17) }} Отметить прочитанным
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</article>
 {% endblock %}

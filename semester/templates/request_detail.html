@@ -2,23 +2,95 @@
 {% from 'components.html' import icon, pill, pageheading %}
 {% block title %}{{ item.title }} · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 18) }} Все заявки</a>
-{{ pageheading(item.title, 'Заявка № ' ~ item.id[:8]|upper) }}
-<section class="surface detail-panel" aria-labelledby="status-heading">
-  <div class="detail-head"><h2 id="status-heading">Ход заявки</h2>{{ pill(item.status, 'green' if item.ready else 'amber') }}</div>
-  <ol class="timeline">
-    <li class="done"><span class="timeline-mark">{{ icon('check', 14) }}</span><div><strong>Принята</strong><p>{{ fmt_dt(item.created_at) }}</p></div></li>
-    <li class="{{ 'done' if item.ready else 'current' }}"><span class="timeline-mark">{{ icon('check' if item.ready else 'clock', 14) }}</span><div><strong>В обработке</strong><p>{{ 'Способ получения — ' ~ delivery[item.delivery]|lower ~ '.' if item.kind != 'appeal' else 'Заявление направлено на рассмотрение.' }}</p></div></li>
-    <li class="{{ 'done' if item.ready else '' }}"><span class="timeline-mark">{{ icon('check', 14) if item.ready else '' }}</span><div><strong>{{ 'Ответ готов' if item.kind == 'appeal' else 'Справка готова' }}</strong><p>{{ fmt_dt(item.ready_at) if item.ready else 'Ожидается ' ~ fmt_dt(item.ready_at) }}</p></div></li>
-  </ol>
-  {% if item.comment %}<div class="request-comment"><strong>Комментарий к заявке</strong><p>{{ item.comment }}</p></div>{% endif %}
-  {% if item.ready %}
-    {% if item.kind == 'appeal' %}<p class="callout">{{ icon('message', 19) }}<span><strong>Ответ деканата</strong> Заявление рассмотрено в демонстрационном режиме. По этому сценарию дополнительных действий не требуется.</span></p>
-    {% elif item.delivery == 'office' %}<p class="callout">{{ icon('pin', 19) }}<span>Заберите документ в кабинете <strong>А–116</strong> в будни с 10:00 до 17:00. Возьмите студенческий билет.</span></p>
-    {% else %}<a class="button primary" href="{{ url_for('request_document', request_id=item.id) }}">Открыть документ {{ icon('arrow', 17) }}</a>{% endif %}
-  {% else %}
-    <a class="button secondary" data-refresh-seconds="{{ item.remaining }}" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 18) }} Обновить статус</a>
-  {% endif %}
-  <p class="form-hint">Обработка в прототипе имитируется и занимает две минуты.</p>
-</section>
+<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 17) }} Все заявки</a>
+
+{% call pageheading(item.title, 'Оформлена ' ~ fmt_dt(item.created_at), 'Заявка #' ~ item.id[:8]|upper) %}
+  <button type="button" class="icon-button outline" data-copy-text="{{ item.id[:8]|upper }}" aria-label="Скопировать номер заявки" title="Скопировать номер #{{ item.id[:8]|upper }}">
+    {{ icon('copy', 17) }}
+  </button>
+{% endcall %}
+
+<div class="form-split">
+  <section class="surface detail-panel" aria-labelledby="status-heading">
+    <div class="detail-head">
+      <div>
+        <h2 id="status-heading">Ход заявки</h2>
+        <p class="detail-sub">Идентификатор реестра <span class="mono-id">#{{ item.id[:8]|upper }}</span></p>
+      </div>
+      {{ pill(item.status, 'green' if item.ready else 'amber') }}
+    </div>
+
+    {% if not item.ready %}
+    <div class="live-timer-box" data-countdown="{{ item.remaining }}">
+      <div class="live-timer-copy">
+        <span class="pulse-dot amber" aria-hidden="true"></span>
+        <div>
+          <strong>Формирование документа в реестре</strong>
+          <small>Страница обновится автоматически по завершении проверки</small>
+        </div>
+      </div>
+      <span class="mono-timer" data-countdown-value>
+        {{ '%02d:%02d'|format(item.remaining // 60, item.remaining % 60) }}
+      </span>
+    </div>
+    {% endif %}
+
+    <ol class="timeline">
+      <li class="done">
+        <span class="timeline-mark">{{ icon('check', 14) }}</span>
+        <div>
+          <strong>Заявка зарегистрирована</strong>
+          <p>{{ fmt_dt(item.created_at) }} · владелец {{ g.student.name }}</p>
+        </div>
+      </li>
+      <li class="{{ 'done' if item.ready else 'current' }}">
+        <span class="timeline-mark">{{ icon('check' if item.ready else 'clock', 14) }}</span>
+        <div>
+          <strong>Проверка учебных данных</strong>
+          <p>{{ 'Способ получения — ' ~ delivery[item.delivery]|lower ~ '.' if item.kind != 'appeal' else 'Заявление передано методисту курса.' }}</p>
+        </div>
+      </li>
+      <li class="{{ 'done' if item.ready else '' }}">
+        <span class="timeline-mark">{{ icon('check', 14) if item.ready else '' }}</span>
+        <div>
+          <strong>{{ 'Ответ деканата готов' if item.kind == 'appeal' else 'Документ подписан и готов' }}</strong>
+          <p>{{ fmt_dt(item.ready_at) if item.ready else 'Плановое время готовности — ' ~ fmt_dt(item.ready_at) }}</p>
+        </div>
+      </li>
+    </ol>
+
+    {% if item.comment %}
+    <div class="request-comment">
+      <strong>Комментарий заявителя</strong>
+      <p>{{ item.comment }}</p>
+    </div>
+    {% endif %}
+
+    <div class="detail-actions">
+      {% if item.ready %}
+        {% if item.kind == 'appeal' %}
+          <p class="callout">{{ icon('message', 19) }}<span><strong>Ответ методиста деканата.</strong> Обращение рассмотрено в демонстрационном контуре. Запись внесена в учебную карточку студента, дополнительных действий не требуется.</span></p>
+        {% elif item.delivery == 'office' %}
+          <p class="callout">{{ icon('pin', 19) }}<span>Бумажный оригинал готов к выдаче в кабинете <strong>А–116</strong> (Корпус А, 1 этаж) по будням с 10:00 до 17:00. Предъявите студенческий билет или Семестр ID.</span></p>
+        {% else %}
+          <a class="button primary" href="{{ url_for('request_document', request_id=item.id) }}">Открыть документ {{ icon('arrow', 17) }}</a>
+        {% endif %}
+      {% else %}
+        <a class="button secondary" data-refresh-seconds="{{ item.remaining }}" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 17) }} Обновить статус</a>
+      {% endif %}
+    </div>
+
+    <p class="form-hint">В конкурсном прототипе выпуск документа имитируется в реальном времени и занимает ровно 2 минуты.</p>
+  </section>
+
+  <aside class="surface side-info-card" aria-label="Параметры заявки">
+    <strong>Сводка по документу</strong>
+    <dl class="mini-dl">
+      <div><dt>Тип</dt><dd>{{ item.title }}</dd></div>
+      <div><dt>Формат выдачи</dt><dd>{{ delivery[item.delivery] }}</dd></div>
+      <div><dt>Группа</dt><dd class="mono-id">{{ g.student.student_group }}</dd></div>
+      <div><dt>Доступ</dt><dd>Только владелец аккаунта</dd></div>
+    </dl>
+  </aside>
+</div>
 {% endblock %}

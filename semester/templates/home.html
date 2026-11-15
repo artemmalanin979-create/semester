@@ -1,61 +1,167 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, lesson, request_row %}
+{% from 'components.html' import icon, lesson, request_row, pill %}
 {% block title %}Главная · Семестр{% endblock %}
 {% block content %}
-<header class="greeting">
-  <p class="date-caption">{{ weekdays[day.weekday()] }}, {{ fmt_date(day) }}</p>
-  <h1>Учебный день</h1>
-  <p>{% if not today %}Сегодня занятий нет{% elif today|length == 1 %}Сегодня одно занятие{% else %}Сегодня {{ today|length }} {{ 'занятия' if today|length < 5 else 'занятий' }}{% endif %}</p>
+<header class="day-hero-bar">
+  <div class="day-hero-copy">
+    <p class="eyebrow">{{ weekdays[day.weekday()] }}, {{ fmt_date(day) }} · Группа {{ g.student.student_group }}</p>
+    <h1>Учебный день</h1>
+    <p class="page-subtitle">
+      {% if not today %}
+        Сегодня аудиторных пар нет — показан ближайший учебный день и актуальные статусы деканата.
+      {% elif today|length == 1 %}
+        В расписании сегодня 1 занятие. Проверьте корпус и уведомления деканата.
+      {% else %}
+        Сегодня {{ today|length }} {{ 'занятия' if today|length < 5 else 'занятий' }} в расписании потока.
+      {% endif %}
+    </p>
+  </div>
+  <div class="day-hero-actions">
+    <a class="button secondary compact" href="{{ url_for('schedule_ics', date=day.isoformat()) }}">
+      {{ icon('download', 16) }}<span>Календарь .ics</span>
+    </a>
+    <a class="button primary compact" href="{{ url_for('request_new', kind='study') }}">
+      {{ icon('plus', 16) }}<span>Заказать справку</span>
+    </a>
+  </div>
 </header>
+
 <div class="dashboard-grid">
   {% if upcoming %}
   <section class="next-class" aria-labelledby="next-heading">
-    <div class="next-clock">
-      <span>{{ 'Сегодня' if upcoming.day == day else fmt_date(upcoming.day) }}</span>
-      <time datetime="{{ upcoming.day.isoformat() }}T{{ upcoming.end if in_class else upcoming.start }}"><small>{{ 'До' if in_class else 'Начало' }}</small>{{ upcoming.end if in_class else upcoming.start }}</time>
-      <span>мск</span>
+    <div class="next-top-row">
+      <span class="live-pill{% if in_class %} active{% endif %}">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        {{ 'Идёт сейчас' if in_class else 'Ближайшая пара' }}
+      </span>
+      <span class="next-day-tag">{{ 'Сегодня' if upcoming.day == day else weekdays[upcoming.day.weekday()] ~ ', ' ~ fmt_date(upcoming.day) }} · МСК</span>
     </div>
-    <div class="next-content">
-      <p class="next-kicker">{{ 'Идёт сейчас' if in_class else 'Ближайшая пара' }}</p>
-      <h2 id="next-heading">{{ upcoming.title }}</h2>
-      <p class="next-meta"><span>{{ icon('pin', 16) }} {{ upcoming.room }}</span><span>{{ upcoming.kind }}</span></p>
-      <a class="next-link" href="{{ url_for('schedule', date=upcoming.day.isoformat()) }}#{{ upcoming.id }}">Открыть расписание {{ icon('arrow', 16) }}</a>
+
+    <div class="next-body">
+      <div class="next-clock-block">
+        <small>{{ 'Окончание в' if in_class else 'Начало в' }}</small>
+        <time class="next-big-time" datetime="{{ upcoming.day.isoformat() }}T{{ upcoming.end if in_class else upcoming.start }}">
+          {{ upcoming.end if in_class else upcoming.start }}
+        </time>
+        <span class="next-slot-span">{{ upcoming.start }}–{{ upcoming.end }} · {{ upcoming.kind }}</span>
+      </div>
+
+      <div class="next-details">
+        <h2 id="next-heading">{{ upcoming.title }}</h2>
+        <p class="next-teacher">{{ icon('user', 15) }}<span>{{ upcoming.teacher }}</span></p>
+        <div class="next-location-row">
+          {% if upcoming.previous %}
+          <span class="hero-chip transfer">{{ icon('arrow-swap', 14) }}<del>{{ upcoming.previous }}</del> → <b>{{ upcoming.room }}</b></span>
+          {% else %}
+          <span class="hero-chip">{{ icon('pin', 14) }}<b>{{ upcoming.room }}</b></span>
+          {% endif %}
+          <span class="hero-chip muted">{{ upcoming.wing }} · {{ upcoming.floor }}</span>
+        </div>
+        {% if upcoming.nav_hint %}
+        <p class="next-route-hint">{{ icon('route', 14) }}<span>{{ upcoming.nav_hint }}</span></p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="next-footer">
+      <div class="day-slots-bar" aria-label="Пары учебного дня">
+        {% for slot_item in agenda %}
+        <span class="slot-pill{% if slot_item.id == upcoming.id %} current{% endif %}{% if slot_item.previous %} moved{% endif %}">
+          <b>{{ slot_item.start }}</b>
+          <span>{{ slot_item.room }}</span>
+        </span>
+        {% endfor %}
+      </div>
+      <a class="next-link" href="{{ url_for('schedule', date=upcoming.day.isoformat()) }}#{{ upcoming.id }}">
+        <span>Открыть расписание</span>{{ icon('arrow', 16) }}
+      </a>
     </div>
   </section>
   {% endif %}
+
   <section class="dashboard-attention" aria-labelledby="attention-heading">
-    <div class="section-heading"><h2 id="attention-heading">Важное</h2><a class="icon-button" href="{{ url_for('notifications') }}" aria-label="Все уведомления">{{ icon('up-right', 18) }}</a></div>
+    <div class="section-heading">
+      <div>
+        <h2 id="attention-heading">Радар деканата</h2>
+        <p>Переносы аудиторий и контрольные точки</p>
+      </div>
+      <a class="icon-button outline" href="{{ url_for('notifications') }}" aria-label="Все уведомления" title="Все уведомления">
+        {{ icon('up-right', 17) }}
+      </a>
+    </div>
     <div class="surface attention-list">
       {% for item in items[:2] %}
       <a class="attention-row{% if item.old_room %} attention-change{% endif %}" href="{{ url_for('notification_detail', notice_id=item.id) }}">
-        <span class="tile-icon">{{ icon(item.icon, 19) }}</span>
-        <span class="row-copy"><small>{{ 'Перенос аудитории' if item.old_room else item.kind }} · {{ fmt_date(item.date) }}</small>
-        <strong>{{ item.title }}</strong>{% if item.old_room %}<span class="room-change"><del>{{ item.old_room }}</del>{{ icon('arrow', 14) }}{{ item.new_room }}</span>{% endif %}</span>
-        {{ icon('chevron', 16) }}
+        <span class="tile-icon{% if item.old_room %} tone-amber{% else %} tone-emerald{% endif %}">{{ icon(item.icon, 19) }}</span>
+        <span class="row-copy">
+          <small>{{ 'Перенос аудитории' if item.old_room else item.kind }} · {{ fmt_date(item.date) }}</small>
+          <strong>{{ item.title }}</strong>
+          {% if item.old_room %}
+          <span class="room-change"><del>{{ item.old_room }}</del>{{ icon('arrow', 13) }}<b>{{ item.new_room }}</b></span>
+          {% else %}
+          <span class="attention-sub">{{ item.body }}</span>
+          {% endif %}
+        </span>
+        <span class="row-arrow">{{ icon('chevron', 16) }}</span>
       </a>
       {% endfor %}
     </div>
   </section>
+
   <section class="dashboard-agenda" aria-labelledby="agenda-heading">
     <div class="section-heading">
-      <div><h2 id="agenda-heading">{{ 'Сегодня в расписании' if today else 'Следующий учебный день' }}</h2>
-      {% if agenda and not today %}<p>{{ weekdays[agenda[0].day.weekday()] }}, {{ fmt_date(agenda[0].day) }}</p>{% endif %}</div>
-      <a class="text-link" href="{{ url_for('schedule', date=agenda[0].day.isoformat() if agenda else day.isoformat(), view='week') }}">На неделю {{ icon('arrow', 16) }}</a>
+      <div>
+        <h2 id="agenda-heading">{{ 'Маршрут учебного дня' if today else 'Ближайший учебный день' }}</h2>
+        {% if agenda and not today %}<p>{{ weekdays[agenda[0].day.weekday()] }}, {{ fmt_date(agenda[0].day) }}</p>{% elif today %}<p>Аудитории, корпуса и переходы между парами</p>{% endif %}
+      </div>
+      <a class="text-link" href="{{ url_for('schedule', date=agenda[0].day.isoformat() if agenda else day.isoformat(), view='week') }}">
+        Сетка недели {{ icon('arrow', 15) }}
+      </a>
     </div>
     <div class="surface lesson-list">
-      {% for item in agenda %}{{ lesson(item) }}{% else %}<p class="empty">На сегодня занятий нет.</p>{% endfor %}
+      {% for item in agenda %}
+        {{ lesson(item, gaps.get(item.id)) }}
+      {% else %}
+        <p class="empty">На выбранный день аудиторных занятий нет.</p>
+      {% endfor %}
     </div>
   </section>
-  <section class="dashboard-requests" aria-labelledby="recent-heading">
-    <div class="section-heading"><h2 id="recent-heading">Мои заявки</h2><a class="text-link" href="{{ url_for('requests_list') }}">Все заявки {{ icon('arrow', 16) }}</a></div>
-    <div class="surface request-list">
-      <a class="request-row quick-card" href="{{ url_for('request_new', kind='study') }}">
-        <span class="tile-icon">{{ icon('plus', 19) }}</span>
-        <span class="row-copy"><strong>Заказать справку</strong><small>Справка об обучении</small></span>
-        <span class="row-arrow">{{ icon('chevron', 16) }}</span>
-      </a>
-      {% for item in recent %}{{ request_row(item, fmt_dt) }}{% endfor %}
-    </div>
-  </section>
+
+  <div class="dashboard-side-stack">
+    <section class="surface rating-mini-card" aria-labelledby="rating-mini-heading">
+      <div class="rating-mini-top">
+        <div>
+          <p class="eyebrow">Рейтинг семестра</p>
+          <h2 id="rating-mini-heading">{{ snap.rating_avg }} <small>/ 100 · {{ snap.rating_letter }}</small></h2>
+        </div>
+        <a class="icon-button outline" href="{{ url_for('grades') }}" aria-label="Открыть успеваемость" title="Успеваемость">
+          {{ icon('up-right', 17) }}
+        </a>
+      </div>
+      <progress class="score-meter" value="{{ snap.rating_int }}" max="100">{{ snap.rating_avg }} из 100</progress>
+      <div class="rating-mini-meta">
+        <span>Средний балл: <b>{{ snap.average }}</b></span>
+        <span>Зачтено: <b>{{ snap.earned_credits }} / {{ snap.total_credits }} ЗЕТ</b></span>
+      </div>
+    </section>
+
+    <section class="dashboard-requests" aria-labelledby="recent-heading">
+      <div class="section-heading">
+        <h2 id="recent-heading">Мои заявки</h2>
+        <a class="text-link" href="{{ url_for('requests_list') }}">Все заявки {{ icon('arrow', 15) }}</a>
+      </div>
+      <div class="surface request-list">
+        <a class="request-row quick-card" href="{{ url_for('request_new', kind='study') }}">
+          <span class="tile-icon tone-emerald">{{ icon('plus', 19) }}</span>
+          <span class="row-copy">
+            <strong>Заказать справку</strong>
+            <small>Справка об обучении · электронно за 2 мин</small>
+          </span>
+          <span class="row-arrow">{{ icon('chevron', 16) }}</span>
+        </a>
+        {% for item in recent %}{{ request_row(item, fmt_dt) }}{% endfor %}
+      </div>
+    </section>
+  </div>
 </div>
 {% endblock %}
