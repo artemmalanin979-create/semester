@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pill, pageheading %}
+{% from 'components.html' import icon, state_badge, pageheading %}
 {% block title %}{{ item.title }} · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 17) }} Все заявки</a>
+<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>Все заявки</span></a>
 
-{% call pageheading(item.title, 'Оформлена ' ~ fmt_dt(item.created_at), 'Заявка #' ~ item.id[:8]|upper) %}
-  <button type="button" class="icon-button outline" data-copy-text="{{ item.id[:8]|upper }}" aria-label="Скопировать номер заявки" title="Скопировать номер #{{ item.id[:8]|upper }}">
+{% call pageheading(item.title, 'Заявка #' ~ item.id[:8]|upper ~ ' · создана ' ~ fmt_dt(item.created_at)) %}
+  <button type="button" class="icon-btn bordered" data-copy-text="{{ item.id[:8]|upper }}" aria-label="Скопировать номер заявки" title="Скопировать #{{ item.id[:8]|upper }}">
     {{ icon('copy', 17) }}
   </button>
 {% endcall %}
@@ -14,22 +14,22 @@
   <section class="surface detail-panel" aria-labelledby="status-heading">
     <div class="detail-head">
       <div>
-        <h2 id="status-heading">Ход заявки</h2>
-        <p class="detail-sub">Идентификатор реестра <span class="mono-id">#{{ item.id[:8]|upper }}</span></p>
+        <h2 id="status-heading">Статус обращения</h2>
+        <p class="detail-sub">Реестровый номер <span class="num">#{{ item.id[:8]|upper }}</span></p>
       </div>
-      {{ pill(item.status, 'green' if item.ready else 'amber') }}
+      {{ state_badge(item.status, 'ok' if item.ready else 'warn') }}
     </div>
 
     {% if not item.ready %}
     <div class="live-timer-box" data-countdown="{{ item.remaining }}">
       <div class="live-timer-copy">
-        <span class="pulse-dot amber" aria-hidden="true"></span>
+        <span class="dot warn-dot" aria-hidden="true"></span>
         <div>
-          <strong>Формирование документа в реестре</strong>
-          <small>Страница обновится автоматически по завершении проверки</small>
+          <strong>Проверка в учебном реестре</strong>
+          <small>Страница обновится автоматически или сразу после решения методиста</small>
         </div>
       </div>
-      <span class="mono-timer" data-countdown-value>
+      <span class="num mono-timer" data-countdown-value>
         {{ '%02d:%02d'|format(item.remaining // 60, item.remaining % 60) }}
       </span>
     </div>
@@ -37,59 +37,66 @@
 
     <ol class="timeline">
       <li class="done">
-        <span class="timeline-mark">{{ icon('check', 14) }}</span>
+        <span class="timeline-mark">{{ icon('check', 13) }}</span>
         <div>
-          <strong>Заявка зарегистрирована</strong>
-          <p>{{ fmt_dt(item.created_at) }} · владелец {{ g.student.name }}</p>
+          <strong>Заявка принята</strong>
+          <p>{{ fmt_dt(item.created_at) }} · {{ g.student.name }}</p>
         </div>
       </li>
       <li class="{{ 'done' if item.ready else 'current' }}">
-        <span class="timeline-mark">{{ icon('check' if item.ready else 'clock', 14) }}</span>
+        <span class="timeline-mark">{{ icon('check' if item.ready else 'clock', 13) }}</span>
         <div>
-          <strong>Проверка учебных данных</strong>
-          <p>{{ 'Способ получения — ' ~ delivery[item.delivery]|lower ~ '.' if item.kind != 'appeal' else 'Заявление передано методисту курса.' }}</p>
+          <strong>Сверка учебных сведений</strong>
+          <p>{{ 'Формат выдачи — ' ~ delivery[item.delivery]|lower ~ '.' if item.kind != 'appeal' else 'Передано методисту учебного офиса.' }}</p>
         </div>
       </li>
       <li class="{{ 'done' if item.ready else '' }}">
-        <span class="timeline-mark">{{ icon('check', 14) if item.ready else '' }}</span>
+        <span class="timeline-mark">{{ icon('check', 13) if item.ready else '' }}</span>
         <div>
-          <strong>{{ 'Ответ деканата готов' if item.kind == 'appeal' else 'Документ подписан и готов' }}</strong>
-          <p>{{ fmt_dt(item.ready_at) if item.ready else 'Плановое время готовности — ' ~ fmt_dt(item.ready_at) }}</p>
+          <strong>{{ 'Ответ учебного офиса готов' if item.kind == 'appeal' else 'Документ выпущен' }}</strong>
+          <p>{{ fmt_dt(item.ready_at) if item.ready else 'Ожидаемое время готовности — ' ~ fmt_dt(item.ready_at) }}</p>
         </div>
       </li>
     </ol>
 
     {% if item.comment %}
     <div class="request-comment">
-      <strong>Комментарий заявителя</strong>
+      <strong>Текст обращения</strong>
       <p>{{ item.comment }}</p>
+    </div>
+    {% endif %}
+
+    {% if item.staff_note %}
+    <div class="request-comment staff-reply">
+      <strong>Комментарий учебного офиса</strong>
+      <p>{{ item.staff_note }}</p>
     </div>
     {% endif %}
 
     <div class="detail-actions">
       {% if item.ready %}
         {% if item.kind == 'appeal' %}
-          <p class="callout">{{ icon('message', 19) }}<span><strong>Ответ методиста деканата.</strong> Обращение рассмотрено в демонстрационном контуре. Запись внесена в учебную карточку студента, дополнительных действий не требуется.</span></p>
+          {% if not item.staff_note %}
+          <p class="callout">{{ icon('message', 18) }}<span><strong>Ответ методиста.</strong> Обращение рассмотрено в демонстрационном контуре, запись внесена в карточку студента.</span></p>
+          {% endif %}
         {% elif item.delivery == 'office' %}
-          <p class="callout">{{ icon('pin', 19) }}<span>Бумажный оригинал готов к выдаче в кабинете <strong>А–116</strong> (Корпус А, 1 этаж) по будням с 10:00 до 17:00. Предъявите студенческий билет или Семестр ID.</span></p>
+          <p class="callout">{{ icon('pin', 18) }}<span>Бумажный оригинал готов к выдаче в окне <strong>А–116</strong> (Корпус А, 1 этаж) по будням с 10:00 до 17:00.</span></p>
         {% else %}
-          <a class="button primary" href="{{ url_for('request_document', request_id=item.id) }}">Открыть документ {{ icon('arrow', 17) }}</a>
+          <a class="btn btn-primary" href="{{ url_for('request_document', request_id=item.id) }}"><span>Открыть документ</span>{{ icon('arrow', 16) }}</a>
         {% endif %}
       {% else %}
-        <a class="button secondary" data-refresh-seconds="{{ item.remaining }}" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 17) }} Обновить статус</a>
+        <a class="btn btn-ghost" data-refresh-seconds="{{ item.remaining }}" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 16) }}<span>Обновить статус</span></a>
       {% endif %}
     </div>
-
-    <p class="form-hint">В конкурсном прототипе выпуск документа имитируется в реальном времени и занимает ровно 2 минуты.</p>
   </section>
 
-  <aside class="surface side-info-card" aria-label="Параметры заявки">
-    <strong>Сводка по документу</strong>
+  <aside class="surface side-info-card" aria-label="Сводка по документу">
+    <h2 class="side-card-title">Сводка</h2>
     <dl class="mini-dl">
       <div><dt>Тип</dt><dd>{{ item.title }}</dd></div>
-      <div><dt>Формат выдачи</dt><dd>{{ delivery[item.delivery] }}</dd></div>
-      <div><dt>Группа</dt><dd class="mono-id">{{ g.student.student_group }}</dd></div>
-      <div><dt>Доступ</dt><dd>Только владелец аккаунта</dd></div>
+      <div><dt>Выдача</dt><dd>{{ delivery[item.delivery] }}</dd></div>
+      <div><dt>Группа</dt><dd class="num">{{ g.student.student_group }}</dd></div>
+      <div><dt>Доступ</dt><dd>Только владелец профиля</dd></div>
     </dl>
   </aside>
 </div>

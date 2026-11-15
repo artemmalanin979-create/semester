@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading, state_badge %}
+{% block title %}Учебный офис · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Учебный офис', g.student.faculty ~ ' · окно ' ~ g.student.student_group ~ ' · обработка справок и обращений') }}
+
+<section class="surface metrics-bar metrics-bar-3" aria-label="Сводка учебного офиса">
+  <div class="metric-cell">
+    <span class="metric-label">Ожидают решения</span>
+    <strong class="metric-value num">{{ pending_total }}</strong>
+    <span class="metric-note">Новые обращения и справки в проверке</span>
+  </div>
+  <div class="metric-cell">
+    <span class="metric-label">Обработано</span>
+    <strong class="metric-value num">{{ ready_total }}</strong>
+    <span class="metric-note">Выпущенные документы и закрытые вопросы</span>
+  </div>
+  <div class="metric-cell">
+    <span class="metric-label">Потоки на сопровождении</span>
+    <strong class="metric-value num">{{ groups|join(' · ') }}</strong>
+    <span class="metric-note">Очные группы бакалавриата</span>
+  </div>
+</section>
+
+<div class="staff-grid">
+  <section aria-labelledby="queue-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="queue-heading">Очередь обращений</h2>
+        <p>Подтверждение выпуска документов и ответы студентам</p>
+      </div>
+      <div class="seg" data-seg data-staff-filters data-count="3" data-index="0" hidden role="tablist" aria-label="Фильтр очереди">
+        <span class="seg-thumb" aria-hidden="true"></span>
+        <button type="button" class="seg-item is-active" data-staff-filter="all" data-seg-idx="0">Все ({{ queue|length }})</button>
+        <button type="button" class="seg-item" data-staff-filter="pending" data-seg-idx="1">В работе ({{ pending_total }})</button>
+        <button type="button" class="seg-item" data-staff-filter="ready" data-seg-idx="2">Готово ({{ ready_total }})</button>
+      </div>
+    </div>
+
+    <div class="surface boxed-list staff-queue-list">
+      {% for item in queue %}
+      <article class="staff-item" data-staff-state="{{ 'ready' if item.ready else 'pending' }}">
+        <div class="staff-item-head">
+          <div class="staff-item-title">
+            <span class="row-glyph">{{ icon(item.icon, 18) }}</span>
+            <div>
+              <strong>{{ item.title }}</strong>
+              <small>{{ item.student_name }} · <span class="num">{{ item.student_group }}</span> · <span class="num">#{{ item.id[:8]|upper }}</span> · {{ fmt_dt(item.created_at) }}</small>
+            </div>
+          </div>
+          {{ state_badge(item.status, 'ok' if item.ready else 'warn') }}
+        </div>
+
+        <div class="staff-item-meta">
+          <span>Формат выдачи: <strong>{{ delivery[item.delivery] }}</strong></span>
+        </div>
+
+        {% if item.comment %}
+        <p class="staff-comment">{{ item.comment }}</p>
+        {% endif %}
+
+        {% if item.staff_note %}
+        <p class="staff-reply-note"><strong>Ответ деканата:</strong> {{ item.staff_note }}</p>
+        {% endif %}
+
+        {% if not item.ready %}
+        <form method="post" action="{{ url_for('staff_resolve_request', request_id=item.id) }}" class="staff-resolve-form">
+          {{ csrf_field(csrf) }}
+          <input type="text" name="staff_note" maxlength="400" placeholder="{{ 'Официальный ответ студенту по обращению…' if item.kind == 'appeal' else 'Комментарий к выпуску (необязательно)…' }}" aria-label="Комментарий методиста">
+          <button type="submit" class="btn btn-primary compact">
+            {{ icon('check', 15) }}<span>{{ 'Ответить и закрыть' if item.kind == 'appeal' else 'Подтвердить выпуск' }}</span>
+          </button>
+        </form>
+        {% endif %}
+      </article>
+      {% else %}
+      <p class="empty">Очередь обращений пуста.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="staff-side-stack" id="announce-box">
+    <section class="surface detail-panel staff-announce-card" aria-labelledby="announce-heading">
+      <div class="card-subhead">
+        <h2 id="announce-heading">Объявление потоку</h2>
+        <p>Сообщение сразу появится в центре уведомлений выбранной группы.</p>
+      </div>
+
+      <form method="post" action="{{ url_for('staff_announce') }}" class="announce-form">
+        {{ csrf_field(csrf) }}
+        <div class="form-row-2">
+          <div class="field-group">
+            <label for="target_group">Адресат</label>
+            <select id="target_group" name="target_group">
+              {% for grp in groups %}
+              <option value="{{ grp }}">Группа {{ grp }}</option>
+              {% endfor %}
+              <option value="all">Все учебные группы</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="kind">Рубрика</label>
+            <select id="kind" name="kind">
+              <option value="Расписание">Расписание</option>
+              <option value="Деканат">Деканат</option>
+              <option value="Сессия">Сессия</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="announce_title">Заголовок</label>
+          <input type="text" id="announce_title" name="title" minlength="4" maxlength="120" placeholder="Например: Перенос консультации на 16:00" required>
+        </div>
+
+        <div class="field-group">
+          <label for="announce_body">Текст уведомления</label>
+          <textarea id="announce_body" name="body" rows="3" minlength="8" maxlength="400" placeholder="Укажите аудиторию, время и необходимые детали для студентов…" required></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full">Опубликовать уведомление</button>
+      </form>
+    </section>
+
+    {% if published %}
+    <section class="surface side-info-card" aria-labelledby="published-heading">
+      <h2 class="side-card-title" id="published-heading">Опубликованные объявления</h2>
+      <div class="published-list">
+        {% for row in published %}
+        <div class="published-item">
+          <div class="published-meta">
+            <span class="num">{{ 'Все группы' if row.target_group == 'all' else row.target_group }}</span>
+            <span class="sep">·</span>
+            <span>{{ row.kind }}</span>
+          </div>
+          <strong>{{ row.title }}</strong>
+          <p>{{ row.body }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

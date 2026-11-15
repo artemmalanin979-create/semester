@@ -1,165 +1,168 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, lesson, request_row, pill %}
+{% from 'components.html' import icon, lesson, request_row, state_badge, pageheading %}
 {% block title %}Главная · Семестр{% endblock %}
 {% block content %}
-<header class="day-hero-bar">
-  <div class="day-hero-copy">
-    <p class="eyebrow">{{ weekdays[day.weekday()] }}, {{ fmt_date(day) }} · Группа {{ g.student.student_group }}</p>
-    <h1>Учебный день</h1>
-    <p class="page-subtitle">
-      {% if not today %}
-        Сегодня аудиторных пар нет — показан ближайший учебный день и актуальные статусы деканата.
-      {% elif today|length == 1 %}
-        В расписании сегодня 1 занятие. Проверьте корпус и уведомления деканата.
-      {% else %}
-        Сегодня {{ today|length }} {{ 'занятия' if today|length < 5 else 'занятий' }} в расписании потока.
-      {% endif %}
-    </p>
-  </div>
-  <div class="day-hero-actions">
-    <a class="button secondary compact" href="{{ url_for('schedule_ics', date=day.isoformat()) }}">
-      {{ icon('download', 16) }}<span>Календарь .ics</span>
-    </a>
-    <a class="button primary compact" href="{{ url_for('request_new', kind='study') }}">
-      {{ icon('plus', 16) }}<span>Заказать справку</span>
-    </a>
-  </div>
-</header>
+{% call pageheading('Учебный день', weekdays[day.weekday()] ~ ', ' ~ fmt_date(day) ~ ' · группа ' ~ g.student.student_group ~ ' · ' ~ week_num ~ ' учебная неделя') %}
+  <a class="icon-btn bordered" href="{{ url_for('schedule_ics', date=day.isoformat()) }}" aria-label="Скачать расписание (.ics)" title="Экспорт расписания в календарь (.ics)">
+    {{ icon('download', 18) }}
+  </a>
+  <a class="btn btn-primary" href="{{ url_for('request_new', kind='study') }}">
+    {{ icon('plus', 16) }}<span>Заказать справку</span>
+  </a>
+{% endcall %}
 
-<div class="dashboard-grid">
-  {% if upcoming %}
-  <section class="next-class" aria-labelledby="next-heading">
-    <div class="next-top-row">
-      <span class="live-pill{% if in_class %} active{% endif %}">
-        <span class="pulse-dot" aria-hidden="true"></span>
-        {{ 'Идёт сейчас' if in_class else 'Ближайшая пара' }}
-      </span>
-      <span class="next-day-tag">{{ 'Сегодня' if upcoming.day == day else weekdays[upcoming.day.weekday()] ~ ', ' ~ fmt_date(upcoming.day) }} · МСК</span>
+{% if upcoming %}
+<section class="surface focus-card" aria-labelledby="next-heading">
+  <div class="card-head">
+    <span class="status-line">
+      <span class="dot{% if not in_class %} muted-dot{% endif %}" aria-hidden="true"></span>
+      <span>{{ 'Идёт сейчас' if in_class else 'Ближайшее занятие' }}</span>
+    </span>
+    <span class="num head-meta">
+      {{ 'Сегодня' if upcoming.day == day else weekdays[upcoming.day.weekday()] ~ ', ' ~ fmt_date(upcoming.day) }} · {{ upcoming.start }}–{{ upcoming.end }}
+    </span>
+  </div>
+
+  <div class="focus-body">
+    <div class="focus-time num">
+      <time datetime="{{ upcoming.day.isoformat() }}T{{ upcoming.start }}">{{ upcoming.start }}</time>
+      <span>до {{ upcoming.end }}</span>
     </div>
 
-    <div class="next-body">
-      <div class="next-clock-block">
-        <small>{{ 'Окончание в' if in_class else 'Начало в' }}</small>
-        <time class="next-big-time" datetime="{{ upcoming.day.isoformat() }}T{{ upcoming.end if in_class else upcoming.start }}">
-          {{ upcoming.end if in_class else upcoming.start }}
-        </time>
-        <span class="next-slot-span">{{ upcoming.start }}–{{ upcoming.end }} · {{ upcoming.kind }}</span>
-      </div>
+    <div class="focus-main">
+      <h2 id="next-heading">{{ upcoming.title }}</h2>
+      <p class="focus-meta">
+        <span>{{ upcoming.kind }}</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span>{{ upcoming.teacher }}</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span>{{ upcoming.wing }}, {{ upcoming.floor }}</span>
+      </p>
+      {% if upcoming.nav_hint %}<p class="focus-hint">{{ upcoming.nav_hint }}</p>{% endif %}
+    </div>
 
-      <div class="next-details">
-        <h2 id="next-heading">{{ upcoming.title }}</h2>
-        <p class="next-teacher">{{ icon('user', 15) }}<span>{{ upcoming.teacher }}</span></p>
-        <div class="next-location-row">
-          {% if upcoming.previous %}
-          <span class="hero-chip transfer">{{ icon('arrow-swap', 14) }}<del>{{ upcoming.previous }}</del> → <b>{{ upcoming.room }}</b></span>
-          {% else %}
-          <span class="hero-chip">{{ icon('pin', 14) }}<b>{{ upcoming.room }}</b></span>
-          {% endif %}
-          <span class="hero-chip muted">{{ upcoming.wing }} · {{ upcoming.floor }}</span>
-        </div>
-        {% if upcoming.nav_hint %}
-        <p class="next-route-hint">{{ icon('route', 14) }}<span>{{ upcoming.nav_hint }}</span></p>
+    <div class="focus-side">
+      <div class="focus-room num">
+        {% if upcoming.previous %}
+        <span class="room-diff">
+          <del>{{ upcoming.previous }}</del>
+          <span aria-hidden="true">→</span>
+          <strong class="warn-text">{{ upcoming.room }}</strong>
+        </span>
+        {% else %}
+        <strong>{{ upcoming.room }}</strong>
         {% endif %}
       </div>
-    </div>
-
-    <div class="next-footer">
-      <div class="day-slots-bar" aria-label="Пары учебного дня">
-        {% for slot_item in agenda %}
-        <span class="slot-pill{% if slot_item.id == upcoming.id %} current{% endif %}{% if slot_item.previous %} moved{% endif %}">
-          <b>{{ slot_item.start }}</b>
-          <span>{{ slot_item.room }}</span>
-        </span>
-        {% endfor %}
-      </div>
-      <a class="next-link" href="{{ url_for('schedule', date=upcoming.day.isoformat()) }}#{{ upcoming.id }}">
-        <span>Открыть расписание</span>{{ icon('arrow', 16) }}
+      <a class="btn btn-ghost compact" href="{{ url_for('schedule', date=upcoming.day.isoformat()) }}#{{ upcoming.id }}">
+        <span>К расписанию</span>{{ icon('arrow', 15) }}
       </a>
     </div>
-  </section>
-  {% endif %}
+  </div>
+</section>
+{% endif %}
 
-  <section class="dashboard-attention" aria-labelledby="attention-heading">
-    <div class="section-heading">
-      <div>
-        <h2 id="attention-heading">Радар деканата</h2>
-        <p>Переносы аудиторий и контрольные точки</p>
-      </div>
-      <a class="icon-button outline" href="{{ url_for('notifications') }}" aria-label="Все уведомления" title="Все уведомления">
-        {{ icon('up-right', 17) }}
-      </a>
-    </div>
-    <div class="surface attention-list">
-      {% for item in items[:2] %}
-      <a class="attention-row{% if item.old_room %} attention-change{% endif %}" href="{{ url_for('notification_detail', notice_id=item.id) }}">
-        <span class="tile-icon{% if item.old_room %} tone-amber{% else %} tone-emerald{% endif %}">{{ icon(item.icon, 19) }}</span>
-        <span class="row-copy">
-          <small>{{ 'Перенос аудитории' if item.old_room else item.kind }} · {{ fmt_date(item.date) }}</small>
-          <strong>{{ item.title }}</strong>
-          {% if item.old_room %}
-          <span class="room-change"><del>{{ item.old_room }}</del>{{ icon('arrow', 13) }}<b>{{ item.new_room }}</b></span>
-          {% else %}
-          <span class="attention-sub">{{ item.body }}</span>
-          {% endif %}
-        </span>
-        <span class="row-arrow">{{ icon('chevron', 16) }}</span>
-      </a>
-      {% endfor %}
-    </div>
-  </section>
-
+<div class="dashboard-grid">
   <section class="dashboard-agenda" aria-labelledby="agenda-heading">
     <div class="section-heading">
       <div>
-        <h2 id="agenda-heading">{{ 'Маршрут учебного дня' if today else 'Ближайший учебный день' }}</h2>
-        {% if agenda and not today %}<p>{{ weekdays[agenda[0].day.weekday()] }}, {{ fmt_date(agenda[0].day) }}</p>{% elif today %}<p>Аудитории, корпуса и переходы между парами</p>{% endif %}
+        <h2 id="agenda-heading">{{ 'Пары на сегодня' if today else 'Ближайший учебный день' }}</h2>
+        {% if agenda and not today %}
+        <p>{{ weekdays[agenda[0].day.weekday()] }}, {{ fmt_date(agenda[0].day) }}</p>
+        {% elif today %}
+        <p>{{ today|length }} {{ 'занятие' if today|length == 1 else ('занятия' if today|length < 5 else 'занятий') }} в расписании</p>
+        {% endif %}
       </div>
       <a class="text-link" href="{{ url_for('schedule', date=agenda[0].day.isoformat() if agenda else day.isoformat(), view='week') }}">
-        Сетка недели {{ icon('arrow', 15) }}
+        <span>Неделя</span>{{ icon('arrow', 15) }}
       </a>
     </div>
-    <div class="surface lesson-list">
+    <div class="surface boxed-list lesson-list">
       {% for item in agenda %}
         {{ lesson(item, gaps.get(item.id)) }}
       {% else %}
-        <p class="empty">На выбранный день аудиторных занятий нет.</p>
+        <p class="empty">На выбранный день аудиторных пар нет.</p>
       {% endfor %}
     </div>
   </section>
 
   <div class="dashboard-side-stack">
-    <section class="surface rating-mini-card" aria-labelledby="rating-mini-heading">
-      <div class="rating-mini-top">
+    <section aria-labelledby="attention-heading">
+      <div class="section-heading">
         <div>
-          <p class="eyebrow">Рейтинг семестра</p>
-          <h2 id="rating-mini-heading">{{ snap.rating_avg }} <small>/ 100 · {{ snap.rating_letter }}</small></h2>
+          <h2 id="attention-heading">Изменения и сроки</h2>
+          <p>Переносы аудиторий и сессия</p>
         </div>
-        <a class="icon-button outline" href="{{ url_for('grades') }}" aria-label="Открыть успеваемость" title="Успеваемость">
+        <a class="icon-btn" href="{{ url_for('notifications') }}" aria-label="Все уведомления" title="Все уведомления">
           {{ icon('up-right', 17) }}
         </a>
       </div>
-      <progress class="score-meter" value="{{ snap.rating_int }}" max="100">{{ snap.rating_avg }} из 100</progress>
-      <div class="rating-mini-meta">
-        <span>Средний балл: <b>{{ snap.average }}</b></span>
-        <span>Зачтено: <b>{{ snap.earned_credits }} / {{ snap.total_credits }} ЗЕТ</b></span>
-      </div>
-    </section>
-
-    <section class="dashboard-requests" aria-labelledby="recent-heading">
-      <div class="section-heading">
-        <h2 id="recent-heading">Мои заявки</h2>
-        <a class="text-link" href="{{ url_for('requests_list') }}">Все заявки {{ icon('arrow', 15) }}</a>
-      </div>
-      <div class="surface request-list">
-        <a class="request-row quick-card" href="{{ url_for('request_new', kind='study') }}">
-          <span class="tile-icon tone-emerald">{{ icon('plus', 19) }}</span>
+      <div class="surface boxed-list">
+        {% for item in items[:2] %}
+        <a class="box-row" href="{{ url_for('notification_detail', notice_id=item.id) }}">
+          <span class="row-glyph">{{ icon(item.icon, 18) }}</span>
           <span class="row-copy">
-            <strong>Заказать справку</strong>
-            <small>Справка об обучении · электронно за 2 мин</small>
+            <strong>{{ item.title }}</strong>
+            {% if item.old_room %}
+            <small class="num"><del>{{ item.old_room }}</del> → <b class="warn-text">{{ item.new_room }}</b> · {{ fmt_date(item.date) }}</small>
+            {% else %}
+            <small>{{ fmt_date(item.date) }} · {{ item.kind }}</small>
+            {% endif %}
           </span>
           <span class="row-arrow">{{ icon('chevron', 16) }}</span>
         </a>
-        {% for item in recent %}{{ request_row(item, fmt_dt) }}{% endfor %}
+        {% endfor %}
+      </div>
+    </section>
+
+    <section aria-labelledby="recent-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="recent-heading">Заявки в деканат</h2>
+          <p>Справки и обращения</p>
+        </div>
+        <a class="icon-btn" href="{{ url_for('requests_list') }}" aria-label="Все заявки" title="Все заявки">
+          {{ icon('up-right', 17) }}
+        </a>
+      </div>
+      <div class="surface boxed-list">
+        {% for item in recent %}
+          {{ request_row(item, fmt_dt) }}
+        {% else %}
+          <a class="box-row" href="{{ url_for('request_new', kind='study') }}">
+            <span class="row-glyph">{{ icon('plus', 18) }}</span>
+            <span class="row-copy">
+              <strong>Оформить справку об обучении</strong>
+              <small>Электронно или в окне А–116</small>
+            </span>
+            <span class="row-arrow">{{ icon('chevron', 16) }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="surface summary-strip-card" aria-labelledby="rating-mini-heading">
+      <div class="summary-strip-head">
+        <div>
+          <h2 id="rating-mini-heading">Успеваемость</h2>
+          <p>Осенний семестр</p>
+        </div>
+        <a class="icon-btn" href="{{ url_for('grades') }}" aria-label="Открыть успеваемость" title="Успеваемость">
+          {{ icon('up-right', 17) }}
+        </a>
+      </div>
+      <div class="summary-kv-row">
+        <div>
+          <small>Рейтинг</small>
+          <strong class="num">{{ snap.rating_avg }} <span class="muted-unit">/ 100</span></strong>
+        </div>
+        <div>
+          <small>Средний балл</small>
+          <strong class="num">{{ snap.average }}</strong>
+        </div>
+        <div>
+          <small>Кредиты</small>
+          <strong class="num">{{ snap.earned_credits }}/{{ snap.total_credits }} ЗЕТ</strong>
+        </div>
       </div>
     </section>
   </div>

@@ -3,8 +3,8 @@
 {% block title %}{{ item.title }} · Документ · Семестр{% endblock %}
 {% block content %}
 <div class="doc-toolbar no-print">
-  <a class="text-link back-link" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('left', 17) }} К заявке</a>
-  <button type="button" class="button primary compact" data-print hidden>{{ icon('print', 17) }} Распечатать или сохранить PDF</button>
+  <a class="text-link back-link" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('left', 16) }}<span>К заявке</span></a>
+  <button type="button" class="btn btn-primary compact" data-print hidden>{{ icon('print', 16) }}<span>Печать или PDF</span></button>
 </div>
 
 <article class="surface document-sheet">
@@ -13,24 +13,23 @@
       {{ mark() }}
       <div>
         <strong>Цифровой деканат «Семестр»</strong>
-        <span>Учебный контур демонстрационного кампуса</span>
+        <span>Учебный реестр демонстрационного кампуса</span>
       </div>
     </div>
     <div class="doc-meta-box">
       <span>Демонстрационный образец</span>
-      <b class="mono-id">Исх. № {{ verify_code }}</b>
+      <b class="num">Исх. № {{ verify_code }}</b>
       <small>от {{ fmt_dt(item.ready_at) }}</small>
     </div>
   </header>
 
   <div class="doc-body">
-    <p class="eyebrow">Официальная форма прототипа</p>
     <h1>{{ item.title }}</h1>
 
     <p class="doc-statement">
       Подтверждается, что <strong>{{ g.student.full_name }}</strong> является обучающимся {{ g.student.course }} курса очной формы обучения
-      подразделения «{{ g.student.faculty }}» по направлению подготовки «{{ g.student.program }}», учебная группа <strong class="mono-id">{{ g.student.student_group }}</strong>
-      (студенческий билет <span class="mono-id">{{ student_meta.card_number }}</span>).
+      подразделения «{{ g.student.faculty }}» по направлению подготовки «{{ g.student.program }}», учебная группа <strong class="num">{{ g.student.student_group }}</strong>
+      (студенческий билет <span class="num">{{ student_meta.card_number }}</span>).
     </p>
 
     {% if records %}
@@ -50,8 +49,8 @@
           <tr>
             <td>{{ row.title }}</td>
             <td>{{ row.kind }}</td>
-            <td class="mono-id">{{ row.credits }}</td>
-            <td class="mono-id">{{ row.score }} / 100 ({{ row.ects }})</td>
+            <td class="num">{{ row.credits }}</td>
+            <td class="num">{{ row.score }} / 100 ({{ row.ects }})</td>
             <td><strong>{{ row.result or 'Сессия (' ~ fmt_date(row.date) ~ ')' }}</strong></td>
           </tr>
           {% endfor %}
@@ -74,7 +73,7 @@
         {{ icon('shield', 18) }}
         <div>
           <strong>Электронная отметка реестра «Семестр»</strong>
-          <small class="mono-id">Код проверки: {{ verify_code }} · Владелец ID {{ g.student.id }}</small>
+          <small class="num">Код проверки: {{ verify_code }} · Владелец ID {{ g.student.id }}</small>
         </div>
       </div>
       <p class="doc-disclaimer">

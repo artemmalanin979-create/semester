@@ -1,55 +1,37 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pageheading, pill %}
+{% from 'components.html' import icon, pageheading, state_badge %}
 {% block title %}Успеваемость · Семестр{% endblock %}
 {% block content %}
-{% call pageheading('Успеваемость и рейтинг', 'Осенний семестр · Группа ' ~ g.student.student_group ~ ' · 100-балльная шкала', 'Академическая ведомость') %}
-  <a class="button secondary compact" href="{{ url_for('request_new', kind='grades') }}">
+{% call pageheading('Успеваемость', 'Осенний семестр · группа ' ~ g.student.student_group ~ ' · 100-балльная рейтинговая шкала') %}
+  <a class="btn btn-ghost compact" href="{{ url_for('request_new', kind='grades') }}">
     {{ icon('layers', 16) }}<span>Заказать выписку</span>
   </a>
 {% endcall %}
 
-<section class="grades-bento" aria-label="Итоги семестра">
-  <div class="grade-hero-card">
-    <div class="grade-hero-top">
-      <span class="eyebrow light">Индекс семестра</span>
-      <span class="ects-badge">ECTS {{ rating_letter }}</span>
-    </div>
-    <div class="grade-hero-value">
-      <strong>{{ rating_avg }}</strong>
-      <span>из 100 баллов</span>
-    </div>
-    <progress class="score-meter hero-meter" value="{{ rating_int }}" max="100">{{ rating_avg }} из 100</progress>
-    <p class="grade-hero-note">Все текущие модули выше порога допуска к сессии (70 баллов).</p>
+<section class="surface metrics-bar" aria-label="Сводка семестра">
+  <div class="metric-cell">
+    <span class="metric-label">Рейтинг семестра</span>
+    <strong class="metric-value num">{{ rating_avg }} <small>/ 100 · {{ rating_letter }}</small></strong>
+    <span class="metric-note">Порог допуска — 70 баллов</span>
   </div>
-
-  <div class="surface grade-stat-card">
-    <span class="eyebrow">Зачётные единицы и GPA</span>
-    <div class="stat-main-pair">
-      <div>
-        <strong>{{ average }}</strong>
-        <small>средний балл из 5</small>
-      </div>
-      <div class="stat-divider" aria-hidden="true"></div>
-      <div>
-        <strong>{{ completed }}<span class="muted-slash">/{{ records|length }}</span></strong>
-        <small>дисциплин закрыто</small>
-      </div>
-    </div>
-    <p class="stat-foot">Накоплено <b>{{ earned_credits }} из {{ total_credits }} ЗЕТ</b> по учебному плану семестра.</p>
+  <div class="metric-cell">
+    <span class="metric-label">Средний балл</span>
+    <strong class="metric-value num">{{ average }} <small>/ 5,0</small></strong>
+    <span class="metric-note">Закрыто {{ completed }} из {{ records|length }} дисциплин</span>
   </div>
-
-  <div class="surface grade-stat-card">
-    <span class="eyebrow">Ближайший рубеж сессии</span>
+  <div class="metric-cell">
+    <span class="metric-label">Зачётные единицы</span>
+    <strong class="metric-value num">{{ earned_credits }} <small>/ {{ total_credits }} ЗЕТ</small></strong>
+    <span class="metric-note">Учебный план семестра</span>
+  </div>
+  <div class="metric-cell">
+    <span class="metric-label">Ближайшая сдача</span>
     {% if next_exam %}
-    <div class="stat-exam-focus">
-      <strong>{{ fmt_date(next_exam.date) }}</strong>
-      <span class="mono-chip">{% if days_left == 0 %}Сегодня{% else %}через {{ days_left }} дн.{% endif %}</span>
-    </div>
-    <p class="stat-exam-title">{{ next_exam.title }}</p>
-    <p class="stat-foot">{{ next_exam.kind }} · {{ next_exam.exam_time }} · ауд. {{ next_exam.exam_room }}</p>
+    <strong class="metric-value num">{{ fmt_date(next_exam.date) }}</strong>
+    <span class="metric-note">{{ next_exam.title }} · {{ next_exam.exam_room }}</span>
     {% else %}
-    <div class="stat-exam-focus"><strong>Сессия закрыта</strong></div>
-    <p class="stat-foot">Все ведомости семестра подписаны.</p>
+    <strong class="metric-value">Закрыта</strong>
+    <span class="metric-note">Все ведомости подписаны</span>
     {% endif %}
   </div>
 </section>
@@ -58,45 +40,45 @@
   <section aria-labelledby="results-heading">
     <div class="section-heading">
       <div>
-        <h2 id="results-heading">Дисциплины семестра</h2>
-        <p>Рейтинговые баллы, кредиты (ЗЕТ) и итоговые отметки</p>
+        <h2 id="results-heading">Дисциплины</h2>
+        <p>Рейтинг, трудоёмкость и итоговые отметки</p>
       </div>
-      <div class="filter-pills" data-grade-filters hidden role="tablist" aria-label="Фильтр дисциплин">
-        <button type="button" class="filter-pill active" data-grade-filter="all">Все ({{ records|length }})</button>
-        <button type="button" class="filter-pill" data-grade-filter="done">Закрыто ({{ completed }})</button>
-        <button type="button" class="filter-pill" data-grade-filter="pending">Сессия ({{ upcoming|length }})</button>
+      <div class="seg" data-seg data-grade-filters data-count="3" data-index="0" hidden role="tablist" aria-label="Фильтр дисциплин">
+        <span class="seg-thumb" aria-hidden="true"></span>
+        <button type="button" class="seg-item is-active" data-grade-filter="all" data-seg-idx="0">Все ({{ records|length }})</button>
+        <button type="button" class="seg-item" data-grade-filter="done" data-seg-idx="1">Сдано ({{ completed }})</button>
+        <button type="button" class="seg-item" data-grade-filter="pending" data-seg-idx="2">Сессия ({{ upcoming|length }})</button>
       </div>
     </div>
 
-    <div class="surface result-list">
+    <div class="surface boxed-list result-list">
       {% for row in records %}
       <article class="result-row" data-grade-state="{{ 'done' if row.result else 'pending' }}">
         <div class="result-info">
-          <div class="result-tags">
-            <span class="kind-tag kind-{{ 'lecture' if row.kind == 'Экзамен' else 'seminar' }}">{{ row.kind }}</span>
-            <span class="wing-tag mono-id">{{ row.credits }} ЗЕТ</span>
-            <span class="wing-tag">{{ row.teacher }}</span>
-          </div>
           <h3>{{ row.title }}</h3>
+          <p class="lesson-meta">
+            <span>{{ row.kind }}</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span class="num">{{ row.credits }} ЗЕТ</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span>{{ row.teacher }}</span>
+          </p>
         </div>
 
-        <div class="result-score-col">
-          <div class="score-line">
-            <span class="mono-score">{{ row.score }}<small>/100</small></span>
-            <span class="ects-mini">{{ row.ects }}</span>
-          </div>
-          <progress class="score-meter compact" value="{{ row.score }}" max="100">{{ row.score }} из 100</progress>
+        <div class="result-score num">
+          <strong>{{ row.score }}<span class="muted-unit">/100</span></strong>
+          <small>{{ row.ects }}</small>
         </div>
 
         <div class="result-final">
-          {% if row.result in ['5', 'Зачтено'] %}
-            {{ pill('Отлично · 5' if row.result == '5' else 'Зачтено', 'green') }}
+          {% if row.result == '5' %}
+            {{ state_badge('Отлично · 5', 'ok') }}
           {% elif row.result == '4' %}
-            {{ pill('Хорошо · 4', 'green') }}
+            {{ state_badge('Хорошо · 4', 'ok') }}
           {% elif row.result %}
-            {{ pill(row.result, 'green') }}
+            {{ state_badge(row.result, 'ok') }}
           {% else %}
-            {{ pill('На сессии · ' ~ fmt_date(row.date), 'amber') }}
+            {{ state_badge('Сессия · ' ~ fmt_date(row.date), 'warn') }}
           {% endif %}
         </div>
       </article>
@@ -107,27 +89,33 @@
   <section aria-labelledby="session-heading">
     <div class="section-heading">
       <div>
-        <h2 id="session-heading">Предстоящая сессия</h2>
-        <p>Расписание зачётов и экзаменов с аудиториями</p>
+        <h2 id="session-heading">Расписание сессии</h2>
+        <p>Зачёты и экзамены с аудиториями</p>
       </div>
     </div>
-    <div class="surface result-list">
+    <div class="surface boxed-list">
       {% for row in upcoming %}
       <article class="result-row session-row">
-        <div class="session-date-badge">
+        <div class="session-date num">
           <b>{{ fmt_date(row.date) }}</b>
-          <span class="mono-id">{{ row.exam_time }} МСК</span>
+          <span>{{ row.exam_time }}</span>
         </div>
         <div class="result-info">
           <h3>{{ row.title }}</h3>
-          <p class="lesson-teacher">{{ row.kind }}<span class="word-dot"></span>{{ row.teacher }}<span class="word-dot"></span>Допуск {{ row.score }} б.</p>
+          <p class="lesson-meta">
+            <span>{{ row.kind }}</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span>{{ row.teacher }}</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span class="num">допуск {{ row.score }}/100</span>
+          </p>
         </div>
-        <div class="lesson-room">
-          <strong class="room-code">{{ icon('pin', 14) }}{{ row.exam_room }}</strong>
+        <div class="lesson-room num">
+          <strong class="room-code">{{ row.exam_room }}</strong>
         </div>
       </article>
       {% else %}
-      <p class="empty">Все результаты выставлены.</p>
+      <p class="empty">Все результаты семестра выставлены.</p>
       {% endfor %}
     </div>
   </section>

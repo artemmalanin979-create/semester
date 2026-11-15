@@ -1,160 +1,239 @@
 (() => {
-  const root = document.documentElement;
-  const THEME_KEY = "semester-theme";
+  "use strict";
 
-  function currentSystemTheme() {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const THEME_KEY = "semester_theme";
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+
+  function storedMode() {
+    try {
+      const val = localStorage.getItem(THEME_KEY);
+      if (val === "light" || val === "dark") return val;
+    } catch {
+      /* ignore storage errors */
+    }
+    const attr = document.documentElement.getAttribute("data-theme");
+    return attr === "light" || attr === "dark" ? attr : "system";
   }
 
-  function applyTheme(theme) {
-    if (theme === "dark" || theme === "light") {
-      root.setAttribute("data-theme", theme);
-    } else {
-      root.removeAttribute("data-theme");
-    }
+  function resolvedTheme(mode = storedMode()) {
+    return mode === "system" ? (media.matches ? "dark" : "light") : mode;
   }
 
-  try {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved === "dark" || saved === "light") {
-      applyTheme(saved);
+  function syncThemeLabels(theme) {
+    const label = theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему";
+    document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+      btn.setAttribute("aria-label", label);
+      btn.setAttribute("title", label);
+    });
+  }
+
+  function applyTheme(theme, persistCookie = false) {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", theme);
+    if (persistCookie) {
+      document.cookie = `${THEME_KEY}=${theme}; path=/; max-age=31536000; SameSite=Lax`;
     }
-  } catch {
-    /* Storage blocked in strict privacy mode */
+    syncThemeLabels(theme);
+  }
+
+  // Initial sync without flashing
+  const initialMode = storedMode();
+  if (initialMode !== "system") {
+    applyTheme(initialMode, false);
+  } else {
+    syncThemeLabels(resolvedTheme("system"));
+  }
+
+  media.addEventListener("change", () => {
+    if (storedMode() === "system") {
+      document.documentElement.removeAttribute("data-theme");
+      syncThemeLabels(resolvedTheme("system"));
+    }
+  });
+
+  function toggleTheme(origin) {
+    const current = resolvedTheme();
+    const next = current === "dark" ? "light" : "dark";
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* ignore */
+    }
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced || !origin || typeof Element.prototype.animate !== "function") {
+      applyTheme(next, true);
+      return;
+    }
+
+    const rect = origin.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const far = Math.hypot(Math.max(cx, window.innerWidth - cx), Math.max(cy, window.innerHeight - cy));
+
+    const svgNs = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNs, "svg");
+    svg.setAttribute("class", "theme-wave");
+    svg.setAttribute("aria-hidden", "true");
+    const circle = document.createElementNS(svgNs, "circle");
+    circle.setAttribute("cx", String(cx));
+    circle.setAttribute("cy", String(cy));
+    circle.setAttribute("r", String(far));
+    circle.setAttribute("class", current === "dark" ? "wave-from-dark" : "wave-from-light");
+    svg.appendChild(circle);
+    document.body.appendChild(svg);
+
+    applyTheme(next, true);
+
+    circle
+      .animate([{ r: `${far}px` }, { r: "0px" }], {
+        duration: 540,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        fill: "forwards",
+      })
+      .finished.catch(() => {})
+      .then(() => svg.remove());
   }
 
   document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => toggleTheme(btn));
+  });
+
+  // Password visibility toggle on /login
+  document.querySelectorAll("[data-password-toggle]").forEach((btn) => {
+    const input = document.getElementById(btn.getAttribute("aria-controls") || "password");
+    if (!input) return;
+    btn.hidden = false;
+    const openIcon = btn.querySelector(".eye-open");
+    const closedIcon = btn.querySelector(".eye-closed");
     btn.addEventListener("click", () => {
-      const active = root.getAttribute("data-theme") || currentSystemTheme();
-      const next = active === "dark" ? "light" : "dark";
-      applyTheme(next);
-      try {
-        localStorage.setItem(THEME_KEY, next);
-      } catch {
-        /* Ignore */
-      }
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      if (openIcon) openIcon.hidden = show;
+      if (closedIcon) closedIcon.hidden = !show;
+      const text = show ? "Скрыть пароль" : "Показать пароль";
+      btn.setAttribute("aria-label", text);
+      btn.setAttribute("title", text);
     });
   });
 
-  /* Password visibility toggle on /login */
-  const toggle = document.querySelector("[data-password-toggle]");
-  const password = document.getElementById("password");
-  if (toggle && password) {
-    toggle.hidden = false;
-    const eyeOpen = toggle.querySelector(".eye-open");
-    const eyeClosed = toggle.querySelector(".eye-closed");
-    toggle.addEventListener("click", () => {
-      const reveal = password.type === "password";
-      password.type = reveal ? "text" : "password";
-      toggle.setAttribute("aria-label", reveal ? "Скрыть пароль" : "Показать пароль");
-      if (eyeOpen && eyeClosed) {
-        eyeOpen.hidden = reveal;
-        eyeClosed.hidden = !reveal;
-      }
-    });
-  }
-
-  /* 1-click demo account switcher on /login */
-  const emailInput = document.getElementById("email");
-  const demoButtons = document.querySelectorAll("[data-demo-email]");
-  if (emailInput && password && demoButtons.length) {
-    demoButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        emailInput.value = btn.dataset.demoEmail || "";
-        password.value = btn.dataset.demoPassword || "";
-        demoButtons.forEach((b) => b.classList.toggle("is-picked", b === btn));
-        const submit = document.querySelector('#login-form button[type="submit"]');
-        if (submit) submit.focus();
-      });
-    });
-  }
-
-  /* Print trigger on /requests/<id>/document */
-  const printButton = document.querySelector("[data-print]");
-  if (printButton && typeof window.print === "function") {
-    printButton.hidden = false;
-    printButton.addEventListener("click", () => window.print());
-  }
-
-  /* Copy request ID button */
-  document.querySelectorAll("[data-copy-text]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const value = btn.dataset.copyText || "";
-      if (!value || !navigator.clipboard) return;
-      try {
-        await navigator.clipboard.writeText(value);
-        btn.setAttribute("title", "Скопировано: #" + value);
-      } catch {
-        /* Ignore clipboard permission errors */
-      }
+  // One-click demo account fill on /login
+  document.querySelectorAll("[data-demo-email]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const emailInput = document.getElementById("email");
+      const passInput = document.getElementById("password");
+      if (!emailInput || !passInput) return;
+      emailInput.value = btn.getAttribute("data-demo-email") || "";
+      passInput.value = btn.getAttribute("data-demo-password") || "";
+      const submitBtn = document.querySelector("#login-form button[type='submit']");
+      if (submitBtn) submitBtn.focus();
     });
   });
 
-  /* Live MM:SS countdown + auto-reload when request finishes processing */
-  const refresh = document.querySelector("[data-refresh-seconds]");
-  const countdownBox = document.querySelector("[data-countdown]");
-  const countdownOut = document.querySelector("[data-countdown-value]");
-  if (refresh) {
-    let remaining = Math.max(1, Number(refresh.dataset.refreshSeconds || 0));
-    if (countdownBox && countdownOut) {
-      const tick = window.setInterval(() => {
-        remaining = Math.max(0, remaining - 1);
-        const mins = String(Math.floor(remaining / 60)).padStart(2, "0");
-        const secs = String(remaining % 60).padStart(2, "0");
-        countdownOut.textContent = `${mins}:${secs}`;
-        if (remaining <= 0) {
-          window.clearInterval(tick);
-        }
-      }, 1000);
-    }
-    window.setTimeout(() => window.location.reload(), (remaining + 1) * 1000);
+  // Segmented controls (.seg) with sliding rounded-square thumb (pure data-index, zero inline style)
+  function activateSegButton(seg, btn) {
+    const idx = btn.getAttribute("data-seg-idx") || "0";
+    seg.setAttribute("data-index", idx);
+    seg.querySelectorAll(".seg-item").forEach((el) => {
+      el.classList.toggle("is-active", el === btn);
+    });
   }
 
-  /* Discipline filters on /grades */
-  const gradeFilterBar = document.querySelector("[data-grade-filters]");
-  if (gradeFilterBar) {
-    const buttons = gradeFilterBar.querySelectorAll("[data-grade-filter]");
-    const rows = document.querySelectorAll("[data-grade-state]");
-    gradeFilterBar.hidden = false;
-    buttons.forEach((btn) => {
+  // Grades filter
+  const gradeSeg = document.querySelector("[data-grade-filters]");
+  if (gradeSeg) {
+    gradeSeg.hidden = false;
+    gradeSeg.querySelectorAll("[data-grade-filter]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const mode = btn.dataset.gradeFilter;
-        buttons.forEach((b) => b.classList.toggle("active", b === btn));
-        rows.forEach((row) => {
-          row.hidden = mode !== "all" && row.dataset.gradeState !== mode;
+        activateSegButton(gradeSeg, btn);
+        const mode = btn.getAttribute("data-grade-filter");
+        document.querySelectorAll("[data-grade-state]").forEach((row) => {
+          row.hidden = mode !== "all" && row.getAttribute("data-grade-state") !== mode;
         });
       });
     });
   }
 
-  /* Notification category filters on /notifications */
-  const noticeFilterBar = document.querySelector("[data-notice-filters]");
-  if (noticeFilterBar) {
-    const buttons = noticeFilterBar.querySelectorAll("[data-notice-filter]");
-    const rows = document.querySelectorAll(".notice-row[data-notice-kind]");
-    noticeFilterBar.hidden = false;
-    buttons.forEach((btn) => {
+  // Notifications filter
+  const noticeSeg = document.querySelector("[data-notice-filters]");
+  if (noticeSeg) {
+    noticeSeg.hidden = false;
+    noticeSeg.querySelectorAll("[data-notice-filter]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const mode = btn.dataset.noticeFilter;
-        buttons.forEach((b) => b.classList.toggle("active", b === btn));
-        rows.forEach((row) => {
+        activateSegButton(noticeSeg, btn);
+        const mode = btn.getAttribute("data-notice-filter");
+        document.querySelectorAll("[data-notice-kind]").forEach((row) => {
           if (mode === "all") {
             row.hidden = false;
           } else if (mode === "unread") {
             row.hidden = !row.hasAttribute("data-unread");
           } else {
-            row.hidden = row.dataset.noticeKind !== mode;
+            row.hidden = row.getAttribute("data-notice-kind") !== mode;
           }
         });
       });
     });
   }
 
-  /* Native <dialog> helpers: Command Palette (Cmd+K) & Campus Pass QR */
+  // Staff queue filter
+  const staffSeg = document.querySelector("[data-staff-filters]");
+  if (staffSeg) {
+    staffSeg.hidden = false;
+    staffSeg.querySelectorAll("[data-staff-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activateSegButton(staffSeg, btn);
+        const mode = btn.getAttribute("data-staff-filter");
+        document.querySelectorAll("[data-staff-state]").forEach((row) => {
+          row.hidden = mode !== "all" && row.getAttribute("data-staff-state") !== mode;
+        });
+      });
+    });
+  }
+
+  // Copy request code button
+  document.querySelectorAll("[data-copy-text]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const value = btn.getAttribute("data-copy-text") || "";
+      if (!value || !navigator.clipboard) return;
+      try {
+        await navigator.clipboard.writeText(value);
+        btn.setAttribute("title", `Скопировано: #${value}`);
+      } catch {
+        /* ignore clipboard restrictions */
+      }
+    });
+  });
+
+  // Print button on /requests/<id>/document
+  document.querySelectorAll("[data-print]").forEach((btn) => {
+    btn.hidden = false;
+    btn.addEventListener("click", () => window.print());
+  });
+
+  // Live countdown on pending requests
+  const timerBox = document.querySelector("[data-countdown]");
+  if (timerBox) {
+    let remaining = parseInt(timerBox.getAttribute("data-countdown") || "0", 10);
+    const out = timerBox.querySelector("[data-countdown-value]");
+    if (remaining > 0 && out) {
+      const id = window.setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          window.clearInterval(id);
+          window.location.reload();
+          return;
+        }
+        const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+        const ss = String(remaining % 60).padStart(2, "0");
+        out.textContent = `${mm}:${ss}`;
+      }, 1000);
+    }
+  }
+
+  // Modals: Command Palette (⌘K / Ctrl+K) and Campus Pass QR
   const cmdDialog = document.getElementById("cmd-palette");
   const cmdInput = document.getElementById("cmd-input");
   const cmdEmpty = document.getElementById("cmd-empty");
-  const cmdItems = document.querySelectorAll("[data-cmd-item]");
   const passDialog = document.getElementById("pass-modal");
 
   function openDialog(dlg) {
@@ -165,12 +244,7 @@
   document.querySelectorAll("[data-open-cmd]").forEach((btn) => {
     btn.addEventListener("click", () => {
       openDialog(cmdDialog);
-      if (cmdInput) {
-        cmdInput.value = "";
-        cmdItems.forEach((el) => { el.hidden = false; });
-        if (cmdEmpty) cmdEmpty.hidden = true;
-        cmdInput.focus();
-      }
+      if (cmdInput) cmdInput.focus();
     });
   });
 
@@ -187,33 +261,15 @@
 
   [cmdDialog, passDialog].forEach((dlg) => {
     if (!dlg) return;
-    dlg.addEventListener("click", (event) => {
-      if (event.target === dlg) dlg.close();
+    dlg.addEventListener("click", (ev) => {
+      if (ev.target === dlg) dlg.close();
     });
   });
 
   if (cmdDialog && cmdInput) {
-    cmdInput.addEventListener("input", () => {
-      const q = cmdInput.value.trim().toLowerCase();
-      let visible = 0;
-      cmdItems.forEach((item) => {
-        const hay = item.dataset.search || "";
-        const match = !q || hay.includes(q);
-        item.hidden = !match;
-        if (match) visible += 1;
-      });
-      if (cmdEmpty) cmdEmpty.hidden = visible > 0;
-    });
-
-    cmdItems.forEach((item) => {
-      item.addEventListener("click", () => {
-        if (cmdDialog.open) cmdDialog.close();
-      });
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
+    document.addEventListener("keydown", (ev) => {
+      if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "k") {
+        ev.preventDefault();
         if (cmdDialog.open) {
           cmdDialog.close();
         } else {
@@ -221,6 +277,18 @@
           cmdInput.focus();
         }
       }
+    });
+
+    cmdInput.addEventListener("input", () => {
+      const q = cmdInput.value.trim().toLowerCase();
+      let visible = 0;
+      cmdDialog.querySelectorAll("[data-cmd-item]").forEach((item) => {
+        const hay = item.getAttribute("data-search") || "";
+        const match = !q || hay.includes(q);
+        item.hidden = !match;
+        if (match) visible += 1;
+      });
+      if (cmdEmpty) cmdEmpty.hidden = visible > 0;
     });
   }
 })();

@@ -33,7 +33,7 @@ from .demo import (
     week_start,
 )
 
-NAV = (
+STUDENT_NAV = (
     ("home", "home", "Главная"),
     ("schedule", "calendar", "Расписание"),
     ("grades", "chart", "Успеваемость"),
@@ -41,17 +41,24 @@ NAV = (
     ("notifications", "bell", "Уведомления"),
 )
 
+STAFF_NAV = (
+    ("staff_dashboard", "layers", "Очередь заявок"),
+    ("profile", "user", "Профиль"),
+)
+
 DELIVERY = {"digital": "Электронно", "office": "В деканате"}
+GROUPS = ("МП-24-1", "МО-23-2")
 READY_DELAY = 120
 LOCAL_HASHES = (
     "scrypt:32768:8:1$RUE0Sr0umX59HRbk$609960ab64f10a3e222acd29038670c30ef2c1161fc1ad58842d0fdf0ce86958a0d368f21b5914a15a5b220476b959248d5b18487c5f8385375c0c4c0df180f1",
     "scrypt:32768:8:1$OEaczuaFNx7CUTm4$c6b8551ddc54688de0d093f6f9e5ccfbc3f8d10f95c2e421f50e50a41344ecd7dab94892c811d9765a3740be7187a2a556080737409875c5970cd78c1edee8ba",
+    "scrypt:32768:8:1$sjIWDgyAojptgEJW$7ba4d62ec06caac01389c1f75839e4363de4e8233d059c1bda85e0284aded5b23db6036630aaed4bed2d507801ca977f9a9f84030b9cf01079d73c9805bd340e",
 )
 LOCAL_DEMO_ACCOUNTS = (
     {
         "name": "Валерия Маякова",
         "group": "МП-24-1",
-        "track": "Маркетинг и продукт · 2 курс",
+        "track": "Маркетинг · 2 курс",
         "email": "lera@demo.example",
         "password": "Semestr-Lera-26",
     },
@@ -61,6 +68,13 @@ LOCAL_DEMO_ACCOUNTS = (
         "track": "Международные отношения · 3 курс",
         "email": "misha@demo.example",
         "password": "Semestr-Misha-26",
+    },
+    {
+        "name": "Елена Орлова",
+        "group": "Деканат",
+        "track": "Учебный офис · окно А–116",
+        "email": "dean@demo.example",
+        "password": "Semestr-Dean-26",
     },
 )
 SESSION_TTL = 8 * 60 * 60
@@ -89,34 +103,53 @@ def create_app(config=None):
         SESSION_COOKIE_SAMESITE="Lax",
         MAX_CONTENT_LENGTH=32 * 1024,
         TRUST_PROXY=os.environ.get("SEMESTER_TRUST_PROXY") == "1",
-        DEMO_PASSWORDS=(os.environ.get("SEMESTER_LERA_PASSWORD"), os.environ.get("SEMESTER_MISHA_PASSWORD")),
+        DEMO_PASSWORDS=(
+            os.environ.get("SEMESTER_LERA_PASSWORD"),
+            os.environ.get("SEMESTER_MISHA_PASSWORD"),
+            os.environ.get("SEMESTER_DEAN_PASSWORD"),
+        ),
     )
     app.config.update(config or {})
     if not app.config["SECRET_KEY"] or (not local and len(app.config["SECRET_KEY"]) < 32):
         raise RuntimeError("Set SEMESTER_SECRET to a random string of at least 32 characters.")
-    passwords = app.config["DEMO_PASSWORDS"]
-    if not local and (not all(passwords) or min(map(len, passwords)) < 12 or passwords[0] == passwords[1]):
-        raise RuntimeError("Set two distinct demo passwords of at least 12 characters.")
+    raw_passwords = tuple(app.config["DEMO_PASSWORDS"])
+    if len(raw_passwords) == 2:
+        raw_passwords = (*raw_passwords, os.environ.get("SEMESTER_DEAN_PASSWORD"))
+    student_passwords = raw_passwords[:2]
+    if not local and (
+        not all(student_passwords)
+        or min(map(len, student_passwords)) < 12
+        or student_passwords[0] == student_passwords[1]
+    ):
+        raise RuntimeError("Set distinct demo passwords of at least 12 characters.")
+    if not local and raw_passwords[2] and len(raw_passwords[2]) < 12:
+        raise RuntimeError("SEMESTER_DEAN_PASSWORD must be at least 12 characters.")
     if app.config["TRUST_PROXY"]:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
-    password_hashes = tuple(
-        generate_password_hash(password) if password else fallback
-        for password, fallback in zip(passwords, LOCAL_HASHES, strict=True)
+
+    password_hashes = (
+        generate_password_hash(raw_passwords[0]) if raw_passwords[0] else LOCAL_HASHES[0],
+        generate_password_hash(raw_passwords[1]) if raw_passwords[1] else LOCAL_HASHES[1],
+        (
+            generate_password_hash(raw_passwords[2])
+            if raw_passwords[2]
+            else (LOCAL_HASHES[2] if local else generate_password_hash(secrets.token_urlsafe(24)))
+        ),
     )
-    is_local_demo = bool(local and not any(passwords))
+    is_local_demo = bool(local and not any(raw_passwords))
     initialize(app.config["DATABASE"], password_hashes)
     app.teardown_appcontext(close_db)
 
     @app.cli.command("rotate-demo-passwords")
     def rotate_demo_passwords():
         """Apply the demo passwords from the environment and revoke active sessions."""
-        if not all(passwords):
-            raise ClickException("Set both demo passwords before rotating.")
+        if not all(student_passwords):
+            raise ClickException("Set demo passwords before rotating.")
         db = get_db()
         with db:
             db.executemany(
                 "UPDATE students SET password_hash = ? WHERE id = ?",
-                zip(password_hashes, (1, 2), strict=True),
+                zip(password_hashes, (1, 2, 3), strict=True),
             )
             db.execute("DELETE FROM login_sessions")
 
@@ -126,6 +159,18 @@ def create_app(config=None):
         if "_csrf" not in session:
             session["_csrf"] = secrets.token_urlsafe(32)
         return session["_csrf"]
+
+    def is_staff():
+        return bool(g.get("student") and g.student["role"] == "staff")
+
+    def require_student():
+        if is_staff():
+            return redirect(url_for("staff_dashboard"), code=303)
+        return None
+
+    def require_staff():
+        if not is_staff():
+            abort(404)
 
     @app.before_request
     def load_session():
@@ -171,7 +216,7 @@ def create_app(config=None):
         item = dict(row)
         item["title"], _, item["icon"] = REQUEST_TYPES[item["kind"]]
         item["ready"] = g.epoch >= item["ready_at"]
-        item["status"] = "Готово" if item["ready"] else "В обработке"
+        item["status"] = "Готово" if item["ready"] else "В работе"
         item["remaining"] = max(0, item["ready_at"] - g.epoch)
         return item
 
@@ -201,7 +246,27 @@ def create_app(config=None):
     def my_notices():
         if "notices" in g:
             return g.notices
+        if is_staff():
+            g.notices = []
+            return g.notices
         items = notices(g.student, g.stamp)
+        published = get_db().execute(
+            """SELECT * FROM staff_notices
+               WHERE target_group IN (?, 'all')
+               ORDER BY created_at DESC LIMIT 12""",
+            (g.student["student_group"],),
+        ).fetchall()
+        for row in published:
+            items.insert(0, {
+                "id": "staff-" + row["id"],
+                "kind": row["kind"],
+                "title": row["title"],
+                "body": row["body"],
+                "date": timestamp_day(row["created_at"]),
+                "icon": "arrow-swap" if row["kind"] == "Расписание" else "info",
+                "link": url_for("schedule") if row["kind"] == "Расписание" else url_for("requests_list"),
+                "action": "К расписанию" if row["kind"] == "Расписание" else "К разделу",
+            })
         ready = get_db().execute(
             """SELECT * FROM requests WHERE student_id = ? AND ready_at <= ?
                ORDER BY ready_at DESC LIMIT 24""",
@@ -211,11 +276,11 @@ def create_app(config=None):
             endpoint = "request_detail"
             action = "К заявке"
             if row["kind"] == "appeal":
-                title = "Ответ на заявление готов"
-                message = "Ответ деканата доступен на странице заявки."
+                title = "Ответ деканата по заявлению"
+                message = row["staff_note"] or "Ответ методиста доступен на странице обращения."
             elif row["delivery"] == "office":
                 title = REQUEST_TYPES[row["kind"]][0] + " готова"
-                message = "Документ можно забрать в деканате. На странице заявки есть адрес и часы работы."
+                message = "Оригинал можно получить в окне А–116 по будням с 10:00 до 17:00."
             else:
                 title = REQUEST_TYPES[row["kind"]][0] + " готова"
                 message = "Электронный документ доступен в кабинете."
@@ -239,7 +304,7 @@ def create_app(config=None):
             )
         }
         for item in items:
-            if item["kind"] in {"Деканат", "Заявки"}:
+            if item["kind"] in {"Деканат", "Заявки"} or item["id"].startswith("staff-"):
                 item["read_key"] = "1"
             else:
                 item["read_key"] = item["date"].isoformat()
@@ -272,19 +337,43 @@ def create_app(config=None):
         }
 
     def build_search_index():
+        if is_staff():
+            return [
+                {
+                    "cat": "Деканат",
+                    "title": "Очередь заявок студентов",
+                    "meta": "Рассмотрение справок и обращений",
+                    "url": url_for("staff_dashboard"),
+                    "icon": "layers",
+                },
+                {
+                    "cat": "Деканат",
+                    "title": "Новое объявление группе",
+                    "meta": "Уведомление о переносе или сроках",
+                    "url": url_for("staff_dashboard") + "#announce-box",
+                    "icon": "bell",
+                },
+                {
+                    "cat": "Профиль",
+                    "title": "Карточка сотрудника",
+                    "meta": STUDENT_PROFILES[g.student["id"]]["card_number"],
+                    "url": url_for("profile"),
+                    "icon": "user",
+                },
+            ]
         group = g.student["student_group"]
         monday = week_start(g.stamp.date())
         entries = [
-            {"cat": "Навигация", "title": "Главная · Учебный день", "meta": "Сводка пар, переносов и заявок", "url": url_for("home"), "icon": "home"},
-            {"cat": "Навигация", "title": "Расписание на неделю", "meta": f"Сетка пар группы {group}", "url": url_for("schedule", view="week"), "icon": "calendar"},
-            {"cat": "Навигация", "title": "Экспорт расписания (.ics)", "meta": "Добавить пары недели в календарь", "url": url_for("schedule_ics"), "icon": "download"},
-            {"cat": "Навигация", "title": "Успеваемость и 100-балльный рейтинг", "meta": "Оценки, зачётные единицы и даты сессии", "url": url_for("grades"), "icon": "chart"},
-            {"cat": "Навигация", "title": "Профиль и пропуск Семестр ID", "meta": STUDENT_PROFILES[g.student["id"]]["card_number"], "url": url_for("profile"), "icon": "id-badge"},
+            {"cat": "Разделы", "title": "Учебный день", "meta": "Ближайшее занятие, изменения и заявки", "url": url_for("home"), "icon": "home"},
+            {"cat": "Разделы", "title": "Расписание недели", "meta": f"Группа {group}", "url": url_for("schedule", view="week"), "icon": "calendar"},
+            {"cat": "Разделы", "title": "Экспорт календаря (.ics)", "meta": "Файл расписания для календаря", "url": url_for("schedule_ics"), "icon": "download"},
+            {"cat": "Разделы", "title": "Успеваемость", "meta": "Баллы, ЗЕТ и расписание сессии", "url": url_for("grades"), "icon": "chart"},
+            {"cat": "Разделы", "title": "Профиль и пропуск", "meta": STUDENT_PROFILES[g.student["id"]]["card_number"], "url": url_for("profile"), "icon": "id-badge"},
         ]
         for kind_key, (title, desc, glyph) in REQUEST_TYPES.items():
             entries.append({
-                "cat": "Деканат",
-                "title": f"Заказать: {title}",
+                "cat": "Заявки",
+                "title": title,
                 "meta": desc,
                 "url": url_for("request_new", kind=kind_key),
                 "icon": glyph,
@@ -297,10 +386,10 @@ def create_app(config=None):
             seen_lessons.add(sig)
             lesson_day = monday + timedelta(days=weekday)
             lesson_id = f"lesson-{lesson_day.isoformat()}-{start.replace(':', '')}"
-            room_note = f"{room} (перенос из {previous})" if previous else room
+            room_note = f"{room} (из {previous})" if previous else room
             entries.append({
-                "cat": "Занятия",
-                "title": f"{title} · {WEEKDAY[weekday][:2]} {start}",
+                "cat": "Пары",
+                "title": f"{title} · {SHORT_DAY[weekday]} {start}",
                 "meta": f"{kind} · {room_note} · {teacher}",
                 "url": f"{url_for('schedule', date=lesson_day.isoformat())}#{lesson_id}",
                 "icon": "pin",
@@ -310,14 +399,26 @@ def create_app(config=None):
     @app.context_processor
     def common():
         signed = bool(g.get("student"))
-        unread_count = sum(item["unread"] for item in my_notices()) if signed else 0
+        staff = is_staff()
+        unread_count = sum(item["unread"] for item in my_notices()) if (signed and not staff) else 0
+        pending_staff = 0
+        if signed and staff:
+            pending_staff = get_db().execute(
+                "SELECT COUNT(*) AS c FROM requests WHERE ready_at > ?",
+                (g.epoch,),
+            ).fetchone()["c"]
         student_meta = STUDENT_PROFILES[g.student["id"]] if signed else None
         pass_qr = (
             qr_svg_path(f"SEMESTR-PASS:{g.student['id']}:{student_meta['card_number']}")
             if signed else ""
         )
+        cookie_theme = request.cookies.get("semester_theme", "")
+        theme_pref = cookie_theme if cookie_theme in {"light", "dark"} else ""
         return dict(
-            nav=NAV,
+            nav=STAFF_NAV if staff else STUDENT_NAV,
+            is_staff=staff,
+            pending_staff=pending_staff,
+            home_endpoint="staff_dashboard" if staff else "home",
             csrf=csrf,
             fmt_date=fmt_date,
             fmt_dt=fmt_dt,
@@ -331,6 +432,7 @@ def create_app(config=None):
             pass_qr=pass_qr,
             week_num=academic_week_number(g.stamp.date()) if signed else 1,
             search_index=build_search_index() if signed else (),
+            theme_pref=theme_pref,
         )
 
     @app.get("/healthz")
@@ -341,7 +443,7 @@ def create_app(config=None):
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if g.student:
-            return redirect(url_for("home"), code=303)
+            return redirect(url_for("staff_dashboard" if is_staff() else "home"), code=303)
         if request.method == "GET":
             return render_template("login.html", error=None, email="")
         email = request.form.get("email", "").strip().lower()[:254]
@@ -371,7 +473,8 @@ def create_app(config=None):
             )
         session.clear()
         session["key"] = key
-        return redirect(url_for("home"), code=303)
+        target = "staff_dashboard" if student["role"] == "staff" else "home"
+        return redirect(url_for(target), code=303)
 
     @app.post("/logout")
     def logout():
@@ -383,6 +486,9 @@ def create_app(config=None):
 
     @app.get("/")
     def home():
+        guard = require_student()
+        if guard:
+            return guard
         group = g.student["student_group"]
         day = g.stamp.date()
         today = lessons_on(group, day)
@@ -402,12 +508,15 @@ def create_app(config=None):
                 upcoming and upcoming["day"] == day and upcoming["start"] <= g.stamp.strftime("%H:%M")
             ),
             items=my_notices(),
-            recent=owned_requests(2),
+            recent=owned_requests(3),
             snap=snap,
         )
 
     @app.get("/schedule")
     def schedule():
+        guard = require_student()
+        if guard:
+            return guard
         today = g.stamp.date()
         try:
             selected = date.fromisoformat(request.args.get("date", today.isoformat()))
@@ -458,6 +567,9 @@ def create_app(config=None):
 
     @app.get("/schedule.ics")
     def schedule_ics():
+        guard = require_student()
+        if guard:
+            return guard
         today = g.stamp.date()
         try:
             selected = date.fromisoformat(request.args.get("date", today.isoformat()))
@@ -474,6 +586,9 @@ def create_app(config=None):
 
     @app.get("/grades")
     def grades():
+        guard = require_student()
+        if guard:
+            return guard
         snap = rating_snapshot()
         next_exam = snap["upcoming"][0] if snap["upcoming"] else None
         days_left = max(0, (next_exam["date"] - g.stamp.date()).days) if next_exam else None
@@ -495,6 +610,9 @@ def create_app(config=None):
 
     @app.get("/requests")
     def requests_list():
+        guard = require_student()
+        if guard:
+            return guard
         try:
             page = max(1, min(int(request.args.get("page", "1")), 100_000))
         except ValueError:
@@ -514,6 +632,9 @@ def create_app(config=None):
 
     @app.route("/requests/new/<kind>", methods=["GET", "POST"])
     def request_new(kind):
+        guard = require_student()
+        if guard:
+            return guard
         if kind not in REQUEST_TYPES:
             abort(404)
         if request.method == "GET":
@@ -554,7 +675,7 @@ def create_app(config=None):
         db = get_db()
         with db:
             db.execute(
-                """INSERT INTO requests VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO requests VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
                    ON CONFLICT(student_id, nonce) DO NOTHING""",
                 (
                     secrets.token_hex(16),
@@ -563,7 +684,7 @@ def create_app(config=None):
                     selected,
                     comment,
                     g.epoch,
-                    g.epoch + READY_DELAY,
+                    g.epoch + (1800 if kind == "appeal" else READY_DELAY),
                     nonce,
                 ),
             )
@@ -576,10 +697,16 @@ def create_app(config=None):
 
     @app.get("/requests/<request_id>")
     def request_detail(request_id):
+        guard = require_student()
+        if guard:
+            return guard
         return render_template("request_detail.html", active="requests_list", item=owned_request(request_id))
 
     @app.get("/requests/<request_id>/document")
     def request_document(request_id):
+        guard = require_student()
+        if guard:
+            return guard
         item = owned_request(request_id)
         if not item["ready"] or item["delivery"] != "digital" or item["kind"] == "appeal":
             abort(404)
@@ -597,10 +724,16 @@ def create_app(config=None):
 
     @app.get("/notifications")
     def notifications():
+        guard = require_student()
+        if guard:
+            return guard
         return render_template("notifications.html", active="notifications", items=my_notices())
 
     @app.get("/notifications/<notice_id>")
     def notification_detail(notice_id):
+        guard = require_student()
+        if guard:
+            return guard
         item = next((item for item in my_notices() if item["id"] == notice_id), None)
         if not item:
             abort(404)
@@ -608,6 +741,9 @@ def create_app(config=None):
 
     @app.post("/notifications/read")
     def notifications_read():
+        guard = require_student()
+        if guard:
+            return guard
         notice_id = request.form.get("notice_id", "")
         items = [item for item in my_notices() if notice_id == "all" or item["id"] == notice_id]
         if not items:
@@ -620,9 +756,85 @@ def create_app(config=None):
             )
         return redirect(url_for("notifications"), code=303)
 
+    @app.get("/staff")
+    def staff_dashboard():
+        require_staff()
+        db = get_db()
+        rows = db.execute(
+            """SELECT requests.*, students.name AS student_name, students.student_group AS student_group,
+                      students.faculty AS student_faculty
+               FROM requests JOIN students ON students.id = requests.student_id
+               ORDER BY (requests.ready_at > ?) DESC, requests.created_at DESC LIMIT 30""",
+            (g.epoch,),
+        ).fetchall()
+        queue = []
+        for row in rows:
+            entry = request_summary(row)
+            entry["student_name"] = row["student_name"]
+            entry["student_group"] = row["student_group"]
+            entry["student_faculty"] = row["student_faculty"]
+            queue.append(entry)
+        published = db.execute(
+            "SELECT * FROM staff_notices ORDER BY created_at DESC LIMIT 8"
+        ).fetchall()
+        pending_total = sum(not item["ready"] for item in queue)
+        ready_total = sum(item["ready"] for item in queue)
+        return render_template(
+            "staff.html",
+            active="staff_dashboard",
+            queue=queue,
+            pending_total=pending_total,
+            ready_total=ready_total,
+            published=published,
+            groups=GROUPS,
+        )
+
+    @app.post("/staff/requests/<request_id>/resolve")
+    def staff_resolve_request(request_id):
+        require_staff()
+        db = get_db()
+        row = db.execute("SELECT * FROM requests WHERE id = ?", (request_id,)).fetchone()
+        if not row:
+            abort(404)
+        staff_note = request.form.get("staff_note", "").strip()[:400]
+        if row["kind"] == "appeal" and not staff_note:
+            staff_note = "Согласовано учебным офисом. Изменения отражены в карточке студента."
+        with db:
+            db.execute(
+                "UPDATE requests SET ready_at = ?, staff_note = ? WHERE id = ?",
+                (min(row["ready_at"], g.epoch), staff_note, request_id),
+            )
+            db.execute(
+                "DELETE FROM notification_reads WHERE student_id = ? AND notice_id = ?",
+                (row["student_id"], "request-" + request_id),
+            )
+        flash("Статус заявки обновлён, уведомление отправлено студенту.")
+        return redirect(url_for("staff_dashboard"), code=303)
+
+    @app.post("/staff/announcements")
+    def staff_announce():
+        require_staff()
+        target_group = request.form.get("target_group", "")
+        kind = request.form.get("kind", "Деканат")
+        title = request.form.get("title", "").strip()
+        body = request.form.get("body", "").strip()
+        if target_group not in (*GROUPS, "all") or kind not in {"Расписание", "Деканат", "Сессия"}:
+            abort(400)
+        if len(title) < 4 or len(title) > 120 or len(body) < 8 or len(body) > 400:
+            flash("Заполните заголовок и текст сообщения.")
+            return redirect(url_for("staff_dashboard"), code=303)
+        db = get_db()
+        with db:
+            db.execute(
+                "INSERT INTO staff_notices VALUES (?, ?, ?, ?, ?, ?)",
+                (secrets.token_hex(12), target_group, kind, title, body, g.epoch),
+            )
+        flash("Объявление опубликовано в ленте студентов.")
+        return redirect(url_for("staff_dashboard"), code=303)
+
     @app.get("/profile")
     def profile():
-        snap = rating_snapshot()
+        snap = None if is_staff() else rating_snapshot()
         return render_template("profile.html", active="profile", snap=snap)
 
     @app.errorhandler(400)

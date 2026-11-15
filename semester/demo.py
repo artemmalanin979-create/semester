@@ -10,9 +10,11 @@ SHORT_DAY = "Пн Вт Ср Чт Пт Сб Вс".split()
 
 STUDENTS = (
     (1, "lera@demo.example", "Валерия Маякова", "Валерия Ильинична Маякова",
-     "Институт маркетинга и предпринимательства", "Маркетинг и управление продуктом", 2, "МП-24-1"),
+     "Институт маркетинга и предпринимательства", "Маркетинг и управление продуктом", 2, "МП-24-1", "student"),
     (2, "misha@demo.example", "Михаил Ратников", "Михаил Егорович Ратников",
-     "Факультет международных отношений", "Международные отношения", 3, "МО-23-2"),
+     "Факультет международных отношений", "Международные отношения", 3, "МО-23-2", "student"),
+    (3, "dean@demo.example", "Елена Орлова", "Елена Викторовна Орлова",
+     "Учебный офис деканата", "Ведущий методист · окно А–116", 0, "А–116", "staff"),
 )
 
 STUDENT_PROFILES = {
@@ -34,10 +36,19 @@ STUDENT_PROFILES = {
         "pass_zone": "Корпуса А, Б, В · Дипломатический читальный зал",
         "pass_valid": "31 августа 2027",
     },
+    3: {
+        "card_number": "ST-А116-09",
+        "degree": "Сотрудник учебного офиса",
+        "funding": "Штатный контур",
+        "languages": "Корпуса А, Б, В",
+        "advisor": "Приём студентов: Пн–Пт, 10:00–17:00",
+        "pass_zone": "Служебный доступ · Учебный офис А–116",
+        "pass_valid": "31 августа 2027",
+    },
 }
 
 ROOMS = {
-    "А–116": ("Корпус А", "1 этаж", "Сервисный центр деканата, правое крыло от атриума"),
+    "А–116": ("Корпус А", "1 этаж", "Учебный офис деканата, правое крыло от атриума"),
     "А–201": ("Корпус А", "2 этаж", "Северная лестница у атриума"),
     "А–204": ("Корпус А", "2 этаж", "Северная лестница у атриума"),
     "А–220": ("Корпус А", "2 этаж", "Восточное крыло, зал семинаров"),
@@ -124,7 +135,7 @@ GRADES = {
 REQUEST_TYPES = {
     "study": ("Справка об обучении", "Подтверждает статус студента, курс, форму обучения и факультет.", "file"),
     "grades": ("Выписка об успеваемости", "Дисциплины, зачётные единицы и 100-балльный рейтинг за семестр.", "layers"),
-    "appeal": ("Заявление в деканат", "Свободное обращение методисту по учебному плану, расписанию или сессии.", "message"),
+    "appeal": ("Заявление в деканат", "Обращение методисту по учебному плану, расписанию или сессии.", "message"),
 }
 
 
@@ -189,7 +200,7 @@ def lessons_on(group, day):
 
 
 def day_gaps(lessons, has_ready_office_doc=False):
-    """Map lesson index -> smart transition or window hint shown after that lesson."""
+    """Map lesson id -> concise transition or window note shown after that lesson."""
     hints = {}
     for idx in range(len(lessons) - 1):
         curr_item = lessons[idx]
@@ -198,10 +209,11 @@ def day_gaps(lessons, has_ready_office_doc=False):
         if gap >= 60:
             hours, mins = divmod(gap, 60)
             span = f"{hours} ч {mins} мин" if mins else f"{hours} ч"
-            if has_ready_office_doc:
-                note = "Успеете забрать готовую справку в деканате (каб. А–116)"
-            else:
-                note = "Читальный зал корпуса А или проектная зона открыты"
+            note = (
+                "Готовую бумажную справку можно забрать в окне А–116"
+                if has_ready_office_doc
+                else "Читальный зал корпуса А открыт"
+            )
             hints[curr_item["id"]] = {
                 "kind": "window",
                 "badge": f"Окно {span}",
@@ -210,16 +222,16 @@ def day_gaps(lessons, has_ready_office_doc=False):
         elif curr_item["wing"] != next_item["wing"]:
             hints[curr_item["id"]] = {
                 "kind": "route",
-                "badge": f"Перерыв {gap} мин · смена корпуса",
-                "text": f"{curr_item['wing']} → {next_item['wing']}: переход по тёплой галерее 2 этажа (~4 мин)",
+                "badge": f"Перерыв {gap} мин",
+                "text": f"{curr_item['wing']} → {next_item['wing']} по галерее 2 этажа (~4 мин)",
             }
     if lessons and has_ready_office_doc and _minutes(lessons[-1]["end"]) <= 16 * 60 + 30:
         last_id = lessons[-1]["id"]
         if last_id not in hints:
             hints[last_id] = {
                 "kind": "office",
-                "badge": "После пар до 17:00",
-                "text": "В кабинете А–116 вас ждёт готовый бумажный экземпляр справки",
+                "badge": "До 17:00",
+                "text": "Бумажный оригинал справки готов к выдаче в окне А–116",
             }
     return hints
 
@@ -268,9 +280,8 @@ def notices(student, stamp):
         "kind": "Сессия",
         "title": f"{checkpoint['kind']}: {checkpoint['title']}",
         "body": (
-            f"Ближайшая контрольная точка назначена на {fmt_date(checkpoint['date'])} "
-            f"в {checkpoint['exam_time']}, аудитория {checkpoint['exam_room']}. "
-            f"Текущий семестровый допуск — {checkpoint['score']} из 100 баллов."
+            f"Назначен на {fmt_date(checkpoint['date'])} в {checkpoint['exam_time']}, "
+            f"аудитория {checkpoint['exam_room']}. Семестровый допуск — {checkpoint['score']} из 100."
         ),
         "date": checkpoint["date"],
         "icon": "clock",
@@ -283,7 +294,7 @@ def notices(student, stamp):
             "kind": "Расписание",
             "title": moved["title"],
             "body": (
-                f"Аудитория изменилась с {moved['previous']} на {moved['room']} ({moved['wing']}, {moved['floor']}). "
+                f"Аудитория изменена с {moved['previous']} на {moved['room']} ({moved['wing']}, {moved['floor']}). "
                 f"Время прежнее, {moved['start']}–{moved['end']}."
             ),
             "date": change_day,
@@ -297,10 +308,10 @@ def notices(student, stamp):
         {
             "id": "office",
             "kind": "Деканат",
-            "title": "Электронные справки и режим работы окна А–116",
+            "title": "Выдача оригиналов в окне А–116",
             "body": (
-                "Цифровые справки формируются с проверочным кодом в разделе заявок. "
-                "Бумажные оригиналы с печатью выдаются в кабинете А–116 по будням с 10:00 до 17:00."
+                "Электронные справки выпускаются в разделе заявок с кодом проверки. "
+                "Бумажные экземпляры с печатью выдаются по будням с 10:00 до 17:00."
             ),
             "date": current,
             "icon": "file",
@@ -311,7 +322,7 @@ def notices(student, stamp):
 
 
 def qr_svg_path(seed_text):
-    """Build a crisp deterministic 21x21 QR-like matrix path for campus pass & certificate verification."""
+    """Build a crisp deterministic 21x21 matrix path for campus pass & certificate verification."""
     size = 21
     digest = sha256(seed_text.encode("utf-8")).digest()
     bits = "".join(f"{byte:08b}" for byte in digest * 3)
@@ -330,7 +341,6 @@ def qr_svg_path(seed_text):
     parts = []
     for r in range(size):
         for c in range(size):
-            # Quiet separator ring around the three 7x7 finder patterns
             if (r == 7 and c < 8) or (c == 7 and r < 8):
                 continue
             if (r == 7 and c >= 13) or (c == 13 and r < 8):

@@ -1,17 +1,21 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, csrf_field, pageheading, pill %}
+{% from 'components.html' import icon, csrf_field, pageheading %}
 {% block title %}{{ item.title }} · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link" href="{{ url_for('notifications') }}">{{ icon('left', 17) }} Все уведомления</a>
-{{ pageheading(item.title, fmt_date(item.date), item.kind) }}
+<a class="text-link back-link" href="{{ url_for('notifications') }}">{{ icon('left', 16) }}<span>Все уведомления</span></a>
+{{ pageheading(item.title, item.kind ~ ' · ' ~ fmt_date(item.date)) }}
 
 <article class="surface detail-panel notice-detail-card">
   {% if item.old_room %}
-  <div class="transfer-banner">
-    <span class="tile-icon tone-amber">{{ icon('arrow-swap', 20) }}</span>
+  <div class="transfer-strip">
+    <span class="row-glyph">{{ icon('arrow-swap', 18) }}</span>
     <div>
       <small>Изменение аудитории в расписании</small>
-      <div class="room-change large"><del>{{ item.old_room }}</del>{{ icon('arrow', 15) }}<b>{{ item.new_room }}</b></div>
+      <div class="room-diff large num">
+        <del>{{ item.old_room }}</del>
+        <span aria-hidden="true">→</span>
+        <strong class="warn-text">{{ item.new_room }}</strong>
+      </div>
     </div>
   </div>
   {% endif %}
@@ -19,12 +23,12 @@
   <p class="notice-detail-body">{{ item.body }}</p>
 
   <div class="notice-actions">
-    <a class="button primary" href="{{ item.link }}">{{ item.action }} {{ icon('arrow', 17) }}</a>
+    <a class="btn btn-primary" href="{{ item.link }}"><span>{{ item.action }}</span>{{ icon('arrow', 16) }}</a>
     {% if item.unread %}
     <form method="post" action="{{ url_for('notifications_read') }}">
       {{ csrf_field(csrf) }}
-      <button type="submit" class="button secondary" name="notice_id" value="{{ item.id }}">
-        {{ icon('check', 17) }} Отметить прочитанным
+      <button type="submit" class="btn btn-ghost" name="notice_id" value="{{ item.id }}">
+        {{ icon('check', 16) }}<span>Отметить прочитанным</span>
       </button>
     </form>
     {% endif %}

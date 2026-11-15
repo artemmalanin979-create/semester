@@ -3,8 +3,8 @@
 {% set title, description, glyph = request_types[kind] %}
 {% block title %}{{ title }} · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 17) }} Все заявки</a>
-{{ pageheading(title, description, 'Оформление документа') }}
+<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>Все заявки</span></a>
+{{ pageheading(title, description) }}
 
 <div class="form-split">
   <form method="post" class="surface detail-panel form-panel">
@@ -14,20 +14,20 @@
 
     {% if kind != 'appeal' %}
     <fieldset class="delivery-fieldset">
-      <legend>Способ получения документа</legend>
+      <legend>Способ получения</legend>
       <div class="delivery-options">
         <label class="radio-option">
           <input type="radio" name="delivery" value="digital" required{% if selected == 'digital' %} checked{% endif %}>
           <span class="radio-copy">
             <strong>Электронно в кабинете</strong>
-            <small>Готовый бланк с QR-штампом откроется прямо на странице заявки и подойдёт для печати в PDF.</small>
+            <small>Документ с матричным кодом проверки откроется на странице заявки и сохраняется в PDF.</small>
           </span>
         </label>
         <label class="radio-option">
           <input type="radio" name="delivery" value="office" required{% if selected == 'office' %} checked{% endif %}>
           <span class="radio-copy">
-            <strong>Бумажный оригинал в деканате</strong>
-            <small>Выдача с синей печатью в кабинете А–116 (будни, 10:00–17:00) по студенческому билету.</small>
+            <strong>Бумажный оригинал в окне А–116</strong>
+            <small>Выдача с печатью по будням с 10:00 до 17:00 при предъявлении студенческого билета.</small>
           </span>
         </label>
       </div>
@@ -35,29 +35,23 @@
     {% endif %}
 
     <div class="field-group">
-      <label for="comment">{{ 'Ваше заявление' if kind == 'appeal' else 'Комментарий' }}{% if kind != 'appeal' %} <small>по желанию</small>{% endif %}</label>
-      <textarea name="comment" id="comment" rows="4" maxlength="500" placeholder="{{ 'Опишите вопрос методисту деканата (минимум 10 знаков)' if kind == 'appeal' else 'Например: для оформления проездного или предоставления по месту стажировки' }}"{% if kind == 'appeal' %} required minlength="10"{% endif %}>{{ comment }}</textarea>
+      <label for="comment">{{ 'Текст заявления' if kind == 'appeal' else 'Комментарий' }}{% if kind != 'appeal' %} <small>необязательно</small>{% endif %}</label>
+      <textarea name="comment" id="comment" rows="4" maxlength="500" placeholder="{{ 'Опишите вопрос методисту деканата (минимум 10 знаков)' if kind == 'appeal' else 'Например: по месту прохождения стажировки' }}"{% if kind == 'appeal' %} required minlength="10"{% endif %}>{{ comment }}</textarea>
     </div>
 
-    <p class="form-hint">Конкурсный прототип: вводите только вымышленные формулировки без персональных данных.</p>
+    <p class="form-hint">Конкурсный прототип: указывайте демонстрационные формулировки без личных данных.</p>
     <div class="form-actions">
-      <button type="submit" class="button primary">Подать заявку {{ icon('arrow', 17) }}</button>
+      <button type="submit" class="btn btn-primary"><span>Отправить заявку</span>{{ icon('arrow', 16) }}</button>
     </div>
   </form>
 
   <aside class="surface side-info-card" aria-label="Сведения об оформлении">
-    <div class="side-info-head">
-      <span class="tile-icon tone-emerald">{{ icon(glyph, 20) }}</span>
-      <div>
-        <strong>Регламент выпуска</strong>
-        <small>Группа {{ g.student.student_group }}</small>
-      </div>
-    </div>
+    <h2 class="side-card-title">Параметры оформления</h2>
     <dl class="mini-dl">
-      <div><dt>Студент</dt><dd>{{ g.student.full_name }}</dd></div>
-      <div><dt>Факультет</dt><dd>{{ g.student.faculty }}</dd></div>
-      <div><dt>Срок в прототипе</dt><dd class="mono-id">2 минуты (автопроверка)</dd></div>
-      <div><dt>Окно деканата</dt><dd>Корпус А, каб. А–116 · Пн–Пт 10:00–17:00</dd></div>
+      <div><dt>Заявитель</dt><dd>{{ g.student.full_name }}</dd></div>
+      <div><dt>Подразделение</dt><dd>{{ g.student.faculty }}</dd></div>
+      <div><dt>Группа</dt><dd class="num">{{ g.student.student_group }}</dd></div>
+      <div><dt>Окно выдачи</dt><dd>Корпус А, каб. А–116 · Пн–Пт 10:00–17:00</dd></div>
     </dl>
   </aside>
 </div>

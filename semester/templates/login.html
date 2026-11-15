@@ -7,22 +7,17 @@
     <header class="login-header">
       <a class="brand" href="{{ url_for('login') }}">
         {{ mark() }}
-        <span class="brand-word">
-          <strong>Семестр</strong>
-          <small>Цифровой деканат</small>
-        </span>
+        <span>Семестр</span>
       </a>
-      <button type="button" class="icon-button outline theme-toggle" data-theme-toggle aria-label="Переключить цветовую тему" title="Переключить тему">
-        <span class="theme-icon-sun">{{ icon('sun', 18) }}</span>
-        <span class="theme-icon-moon">{{ icon('moon', 18) }}</span>
+      <button type="button" class="icon-btn theme-toggle" data-theme-toggle aria-label="Переключить тему" title="Переключить тему">
+        {{ icon('sun', 19) }}
       </button>
     </header>
 
     <section class="login-form-wrap">
       <div class="login-intro">
-        <p class="eyebrow">Студенческий портал · Осенний семестр</p>
         <h1>Вход в кабинет</h1>
-        <p class="lede">Расписание с навигацией по корпусам, 100-балльный академический рейтинг и выпуск справок без очередей.</p>
+        <p class="lede">Расписание, академическая ведомость, справки и учебный офис в одном окне.</p>
       </div>
 
       <form method="post" class="login-form" id="login-form">
@@ -30,7 +25,7 @@
         {% if error %}<p class="form-error" role="alert">{{ icon('info', 17) }}<span>{{ error }}</span></p>{% endif %}
 
         <div class="field-group">
-          <label for="email">Почта</label>
+          <label for="email">Корпоративная почта</label>
           <input type="email" id="email" name="email" value="{{ email }}" placeholder="name@demo.example" autocomplete="username" maxlength="254" required>
         </div>
 
@@ -38,31 +33,30 @@
           <label for="password">Пароль</label>
           <div class="password-input">
             <input type="password" id="password" name="password" placeholder="••••••••••••" autocomplete="current-password" maxlength="256" required>
-            <button type="button" class="icon-button subtle password-toggle" data-password-toggle hidden aria-controls="password" aria-label="Показать пароль" title="Показать пароль">
+            <button type="button" class="icon-btn password-toggle" data-password-toggle hidden aria-controls="password" aria-label="Показать пароль" title="Показать пароль">
               <span class="eye-open">{{ icon('eye', 18) }}</span>
               <span class="eye-closed" hidden>{{ icon('eye-off', 18) }}</span>
             </button>
           </div>
         </div>
 
-        <button type="submit" class="button primary button-full">Войти</button>
+        <button type="submit" class="btn btn-primary btn-full">Войти</button>
       </form>
 
       {% if demo_accounts %}
       <section class="demo-switcher" aria-labelledby="demo-heading">
         <div class="demo-switcher-head">
-          <span id="demo-heading">Демо-профили для проверки сценариев</span>
-          <small>1 клик — подставить данные</small>
+          <span id="demo-heading">Тестовые профили</span>
+          <small>заполнение в 1 клик</small>
         </div>
-        <div class="demo-cards">
+        <div class="boxed-list demo-cards">
           {% for acc in demo_accounts %}
-          <button type="button" class="demo-account-btn" data-demo-email="{{ acc.email }}" data-demo-password="{{ acc.password }}" aria-label="Заполнить профиль {{ acc.name }}">
-            <span class="avatar small">{{ acc.name.split()[0][0] }}{{ acc.name.split()[1][0] }}</span>
+          <button type="button" class="demo-account-btn" data-demo-email="{{ acc.email }}" data-demo-password="{{ acc.password }}" aria-label="Подставить профиль {{ acc.name }}">
             <span class="demo-account-copy">
               <strong>{{ acc.name }}</strong>
               <small>{{ acc.track }}</small>
             </span>
-            <span class="mono-chip">{{ acc.group }}</span>
+            <span class="num demo-code">{{ acc.group }}</span>
           </button>
           {% endfor %}
         </div>
@@ -71,27 +65,13 @@
     </section>
 
     <footer class="login-footer">
-      Конкурсный прототип для МГИМО × AI-CHALLENGE. Не является официальным сервисом университета; все профили и документы вымышлены.
+      Конкурсный прототип МГИМО × AI-CHALLENGE. Все учебные профили и документы созданы для демонстрации.
     </footer>
   </div>
 
-  <aside class="login-visual" aria-label="Архитектура кампуса">
+  <aside class="login-visual" aria-label="Учебный корпус">
     <div class="login-photo-frame">
-      <img src="{{ url_for('static', filename='login-atrium.webp') }}" alt="Светлый атриум учебного корпуса с видом на сосновый двор" width="960" height="1280">
-      <div class="login-photo-overlay">
-        <div class="overlay-badges">
-          <span class="glass-pill"><span class="pulse-dot"></span>Деканат онлайн · окно А–116 до 17:00</span>
-          <span class="glass-pill mono-id">МСК · Корпуса А · Б · В</span>
-        </div>
-        <div class="overlay-caption">
-          <p class="overlay-quote">Единое окно учебного дня: от переноса семинара в соседний корпус до готовой выписки с электронным кодом проверки.</p>
-          <div class="overlay-stats">
-            <div><b>~2 мин</b><span>выпуск электронной справки</span></div>
-            <div><b>100 б.</b><span>рейтинговая шкала семестра</span></div>
-            <div><b>iCal</b><span>синхронизация расписания</span></div>
-          </div>
-        </div>
-      </div>
+      <img src="{{ url_for('static', filename='campus.webp') }}" alt="Бетонные пилоны и переходная галерея модернистского учебного корпуса в вечернем свете" width="1376" height="928">
     </div>
   </aside>
 </div>

@@ -13,6 +13,7 @@ from semester.demo import academic_results
 DEMO = [
     ("lera@demo.example", "Semestr-Lera-26"),
     ("misha@demo.example", "Semestr-Misha-26"),
+    ("dean@demo.example", "Semestr-Dean-26"),
 ]
 
 
@@ -168,6 +169,64 @@ class PortalTest(unittest.TestCase):
         self.assertEqual(result.status_code, 422)
         self.assertNotIn("<script>alert(1)</script>", result.get_data(as_text=True))
 
+    def test_staff_queue_resolution_and_group_announcements_are_role_isolated(self):
+        # Student cannot access /staff
+        self.login()
+        self.assertEqual(self.browser.get("/staff").status_code, 404)
+        appeal_form = self.browser.get("/requests/new/appeal")
+        created = self.browser.post("/requests/new/appeal", data={
+            "_csrf": token(appeal_form),
+            "nonce": token(appeal_form, "nonce"),
+            "comment": "Прошу перенести сдачу зачёта по уважительной причине.",
+        })
+        req_path = urlsplit(created.location).path
+        req_id = req_path.split("/")[-1]
+
+        # Staff logs in and is redirected to /staff
+        staff = self.app.test_client()
+        login_res = self.login(staff, 2)
+        self.assertEqual(urlsplit(login_res.location).path, "/staff")
+        self.assertEqual(urlsplit(staff.get("/").location).path, "/staff")
+        staff_page = staff.get("/staff")
+        self.assertEqual(staff_page.status_code, 200)
+        self.assertIn(req_id[:8].upper(), staff_page.get_data(as_text=True))
+
+        # Staff resolves the student's appeal with an official reply
+        resolved = staff.post(f"/staff/requests/{req_id}/resolve", data={
+            "_csrf": token(staff_page),
+            "staff_note": "Заявление согласовано, перенос назначен на резервный день.",
+        })
+        self.assertEqual(resolved.status_code, 303)
+        self.assertIn(
+            "Заявление согласовано, перенос назначен на резервный день.",
+            self.browser.get(req_path).get_data(as_text=True),
+        )
+        self.assertIn(
+            "Ответ деканата по заявлению",
+            self.browser.get("/notifications").get_data(as_text=True),
+        )
+
+        # Staff publishes an announcement strictly for МП-24-1
+        staff_page = staff.get("/staff")
+        announced = staff.post("/staff/announcements", data={
+            "_csrf": token(staff_page),
+            "target_group": "МП-24-1",
+            "kind": "Расписание",
+            "title": "Дополнительная консультация в Б–302",
+            "body": "В четверг в 16:00 пройдёт разбор проектных работ группы МП-24-1.",
+        })
+        self.assertEqual(announced.status_code, 303)
+        self.assertIn(
+            "Дополнительная консультация в Б–302",
+            self.browser.get("/notifications").get_data(as_text=True),
+        )
+        other_student = self.app.test_client()
+        self.login(other_student, 1)
+        self.assertNotIn(
+            "Дополнительная консультация в Б–302",
+            other_student.get("/notifications").get_data(as_text=True),
+        )
+
     def test_pages_contain_no_inline_styles_or_scripts_for_strict_csp(self):
         login_html = self.browser.get("/login").get_data(as_text=True)
         self.assertNotRegex(login_html, r"\sstyle=")
@@ -176,6 +235,12 @@ class PortalTest(unittest.TestCase):
         for path in ("/", "/schedule", "/schedule?view=week", "/grades", "/requests",
                      "/requests/new/study", "/notifications", "/profile"):
             html = self.browser.get(path).get_data(as_text=True)
+            self.assertNotRegex(html, r"\sstyle=", msg=path)
+            self.assertNotRegex(html, r"<script(?![^>]*\bsrc=)", msg=path)
+        staff = self.app.test_client()
+        self.login(staff, 2)
+        for path in ("/staff", "/profile"):
+            html = staff.get(path).get_data(as_text=True)
             self.assertNotRegex(html, r"\sstyle=", msg=path)
             self.assertNotRegex(html, r"<script(?![^>]*\bsrc=)", msg=path)
 

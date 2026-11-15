@@ -1,49 +1,50 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, csrf_field, pageheading, pill %}
+{% from 'components.html' import icon, csrf_field, pageheading, state_badge %}
 {% block title %}Уведомления · Семестр{% endblock %}
 {% block content %}
-{% call pageheading('Центр уведомлений', 'Переносы аудиторий, рубежи сессии, готовность справок и объявления деканата.', 'События кабинета') %}
+{% call pageheading('Уведомления', 'Переносы аудиторий, рубежи сессии, готовность документов и объявления учебного офиса.') %}
   {% if unread_count %}
   <form method="post" action="{{ url_for('notifications_read') }}">
     {{ csrf_field(csrf) }}
-    <button type="submit" class="button secondary compact" name="notice_id" value="all">
-      {{ icon('checks', 17) }}<span>Прочитать все ({{ unread_count }})</span>
+    <button type="submit" class="btn btn-ghost compact" name="notice_id" value="all">
+      {{ icon('checks', 16) }}<span>Прочитать все ({{ unread_count }})</span>
     </button>
   </form>
   {% endif %}
 {% endcall %}
 
 <div class="section-heading">
-  <h2>Входящие {% if unread_count %}{{ pill(unread_count ~ ' новых', 'green') }}{% endif %}</h2>
-  <div class="filter-pills" data-notice-filters hidden role="tablist" aria-label="Категории уведомлений">
-    <button type="button" class="filter-pill active" data-notice-filter="all">Все</button>
-    <button type="button" class="filter-pill" data-notice-filter="unread">Непрочитанные</button>
-    <button type="button" class="filter-pill" data-notice-filter="Расписание">Расписание</button>
-    <button type="button" class="filter-pill" data-notice-filter="Сессия">Сессия</button>
-    <button type="button" class="filter-pill" data-notice-filter="Заявки">Заявки</button>
+  <div class="heading-inline">
+    <h2>Входящие</h2>
+    {% if unread_count %}{{ state_badge(unread_count ~ ' новых', 'ok') }}{% endif %}
+  </div>
+  <div class="seg" data-seg data-notice-filters data-count="4" data-index="0" hidden role="tablist" aria-label="Категории уведомлений">
+    <span class="seg-thumb" aria-hidden="true"></span>
+    <button type="button" class="seg-item is-active" data-notice-filter="all" data-seg-idx="0">Все</button>
+    <button type="button" class="seg-item" data-notice-filter="unread" data-seg-idx="1">Новые</button>
+    <button type="button" class="seg-item" data-notice-filter="Расписание" data-seg-idx="2">Пары</button>
+    <button type="button" class="seg-item" data-notice-filter="Заявки" data-seg-idx="3">Заявки</button>
   </div>
 </div>
 
-<section class="surface notices" aria-label="Входящие">
+<section class="surface boxed-list notices-list" aria-label="Входящие">
   {% for item in items %}
-  <a class="notice-row{% if item.unread %} is-unread{% endif %}"
+  <a class="box-row notice-row{% if item.unread %} is-unread{% endif %}"
      href="{{ url_for('notification_detail', notice_id=item.id) }}"
      data-notice-kind="{{ item.kind }}"
      {% if item.unread %}data-unread="{{ item.id }}"{% endif %}>
-    <span class="tile-icon{% if item.old_room %} tone-amber{% elif item.unread %} tone-emerald{% endif %}">
-      {{ icon(item.icon, 19) }}
-    </span>
+    <span class="row-glyph">{{ icon(item.icon, 18) }}</span>
     <span class="row-copy">
       <small class="notice-meta">
-        <span class="notice-cat">{{ item.kind }}</span>
-        <span class="word-dot"></span>
-        <span>{{ fmt_date(item.date) }}</span>
-        {% if item.unread %}<span class="unread-dot" aria-label="Новое"></span>{% endif %}
+        <span>{{ item.kind }}</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span class="num">{{ fmt_date(item.date) }}</span>
+        {% if item.unread %}<span class="dot unread-dot" aria-label="Новое"></span>{% endif %}
       </small>
       <strong>{{ item.title }}</strong>
       <span class="notice-body">{{ item.body }}</span>
     </span>
-    <span class="row-arrow">{{ icon('chevron', 17) }}</span>
+    <span class="row-arrow">{{ icon('chevron', 16) }}</span>
   </a>
   {% else %}
   <p class="empty">Уведомлений пока нет.</p>
