@@ -5,7 +5,7 @@ services:
       SEMESTER_SECRET: ${SEMESTER_SECRET:?Set SEMESTER_SECRET}
       SEMESTER_LERA_PASSWORD: ${SEMESTER_LERA_PASSWORD:?Set SEMESTER_LERA_PASSWORD}
       SEMESTER_MISHA_PASSWORD: ${SEMESTER_MISHA_PASSWORD:?Set SEMESTER_MISHA_PASSWORD}
-      SEMESTER_DEAN_PASSWORD: ${SEMESTER_DEAN_PASSWORD:-}
+      SEMESTER_DEAN_PASSWORD: ${SEMESTER_DEAN_PASSWORD:?Set SEMESTER_DEAN_PASSWORD}
       SEMESTER_TRUST_PROXY: "1"
     volumes:
       - app-data:/data
@@ -18,15 +18,21 @@ services:
       retries: 3
   proxy:
     image: docker.io/library/caddy:2-alpine
+    depends_on:
+      app:
+        condition: service_healthy
     environment:
       SEMESTER_DOMAIN: ${SEMESTER_DOMAIN:?Set SEMESTER_DOMAIN}
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - tls-data:/data
+      - caddy-config:/config
     restart: unless-stopped
 volumes:
   app-data:
   tls-data:
+  caddy-config:
