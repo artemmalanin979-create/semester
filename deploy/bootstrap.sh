@@ -5,7 +5,7 @@
 # Если домена ещё нет, скрипт автоматически соберёт временный HTTPS-домен <IP>.sslip.io.
 set -euo pipefail
 
-APP_DIR="${SEMESTER_APP_DIR:-/opt/semester}"
+APP_DIR="${SEMESTER_APP_DIR:-/opt/semestr}"
 REPO_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ "${EUID}" -ne 0 ]]; then

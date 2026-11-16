@@ -9,8 +9,8 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Семестр{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='3') }}">
-  <script defer src="{{ url_for('static', filename='portal.js', v='3') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='7') }}">
+  <script defer src="{{ url_for('static', filename='portal.js', v='7') }}"></script>
 </head>
 <body class="{{ 'signed-in' if g.student else 'signed-out' }}">
   <a class="skip-link" href="#content">К содержимому</a>
@@ -30,8 +30,10 @@
         <span class="nav-label">{{ label }}</span>
         {% if endpoint == 'notifications' and unread_count %}
         <span class="nav-count num" aria-label="Непрочитанных: {{ unread_count }}">{{ unread_count }}</span>
+        {% elif endpoint == 'campus' and unpaid_count %}
+        <span class="nav-count warn-count num" aria-label="Счетов к оплате: {{ unpaid_count }}">{{ unpaid_count }}</span>
         {% elif endpoint == 'staff_dashboard' and pending_staff %}
-        <span class="nav-count num" aria-label="Ожидают: {{ pending_staff }}">{{ pending_staff }}</span>
+        <span class="nav-count warn-count num" aria-label="Ожидают: {{ pending_staff }}">{{ pending_staff }}</span>
         {% endif %}
       </a>
       {% endfor %}
@@ -56,7 +58,7 @@
 
     <button type="button" class="cmd-trigger" data-open-cmd aria-label="Быстрый поиск по кабинету">
       {{ icon('search', 16) }}
-      <span class="cmd-trigger-text">{{ 'Поиск заявок и разделов…' if is_staff else 'Поиск предметов, аудиторий и справок…' }}</span>
+      <span class="cmd-trigger-text">{{ 'Поиск обращений, потоков и разделов…' if is_staff else 'Поиск предметов, справок, оплаты общежития…' }}</span>
       <kbd class="cmd-kbd num">⌘K</kbd>
     </button>
 
@@ -64,6 +66,11 @@
       <button type="button" class="icon-btn mobile-search-btn" data-open-cmd aria-label="Поиск по кабинету" title="Поиск (⌘K)">
         {{ icon('search', 18) }}
       </button>
+      {% if not is_staff %}
+      <a class="icon-btn" href="{{ url_for('navigator') }}" aria-label="Умный навигатор деканата" title="Умный навигатор ситуаций">
+        {{ icon('compass', 18) }}
+      </a>
+      {% endif %}
       <button type="button" class="icon-btn" data-open-pass aria-label="Электронный пропуск" title="Электронный пропуск">
         {{ icon('qrcode', 18) }}
       </button>
@@ -89,20 +96,22 @@
     {% endwith %}
     {% block content %}{% endblock %}
     {% if g.student %}
-    <footer class="app-footer">
-      <span>Семестр · Конкурсный прототип МГИМО × AI-CHALLENGE</span>
-      <span>Вымышленные учебные профили и демонстрационные данные</span>
+    <footer class="app-footer" role="contentinfo">
+      <span>{{ concept_notice }}</span>
+      <span class="num">Семестр · демо-контур</span>
     </footer>
     {% endif %}
   </main>
 
   {% if g.student %}
   <nav class="bottom-nav" aria-label="Разделы кабинета">
-    {% set short_labels = {'schedule': 'Пары', 'grades': 'Оценки', 'notifications': 'Входящие', 'staff_dashboard': 'Очередь'} %}
-    {% for endpoint, glyph, label in nav %}
+    {% for endpoint, glyph, short_label in mobile_nav %}
     <a class="{% if active == endpoint %}selected{% endif %}" href="{{ url_for(endpoint) }}"{% if active == endpoint %} aria-current="page"{% endif %}>
-      <span class="bottom-icon">{{ icon(glyph, 19) }}{% if endpoint == 'notifications' and unread_count %}<i></i>{% endif %}</span>
-      <span>{{ short_labels.get(endpoint, label) }}</span>
+      <span class="bottom-icon">
+        {{ icon(glyph, 19) }}
+        {% if endpoint == 'campus' and unpaid_count %}<i class="warn"></i>{% elif endpoint == 'staff_dashboard' and pending_staff %}<i class="warn"></i>{% endif %}
+      </span>
+      <span>{{ short_label }}</span>
     </a>
     {% endfor %}
   </nav>
@@ -111,7 +120,7 @@
     <div class="cmd-shell">
       <div class="cmd-header">
         {{ icon('search', 18) }}
-        <input type="search" id="cmd-input" class="cmd-input" placeholder="Предмет, аудитория, преподаватель или справка…" autocomplete="off">
+        <input type="search" id="cmd-input" class="cmd-input" placeholder="Предмет, аудитория, военкомат, общежитие, ПГАС…" autocomplete="off">
         <button type="button" class="icon-btn" data-close-dialog aria-label="Закрыть поиск">{{ icon('close', 17) }}</button>
       </div>
       <div class="cmd-results" id="cmd-results">
@@ -126,7 +135,7 @@
         </a>
         {% endfor %}
       </div>
-      <p class="cmd-empty" id="cmd-empty" hidden>Совпадений нет. Попробуйте код аудитории или название предмета.</p>
+      <p class="cmd-empty" id="cmd-empty" hidden>Совпадений нет. Попробуйте запрос в Умном навигаторе.</p>
     </div>
   </dialog>
 

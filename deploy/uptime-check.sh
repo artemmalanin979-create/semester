@@ -2,8 +2,8 @@
 # Проверка /healthz каждые 5 минут с автоподнятием контейнеров при сбое.
 set -euo pipefail
 
-APP_DIR="${SEMESTER_APP_DIR:-/opt/semester}"
-LOG_FILE="${SEMESTER_UPTIME_LOG:-/var/log/semester-uptime.log}"
+APP_DIR="${SEMESTER_APP_DIR:-/opt/semestr}"
+LOG_FILE="${SEMESTER_UPTIME_LOG:-/var/log/semestr-uptime.log}"
 
 cd "$APP_DIR"
 if [[ -f .env ]]; then

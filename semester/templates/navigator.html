@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading, state_badge %}
+{% block title %}Умный навигатор · Семестр{% endblock %}
+{% block content %}
+<a class="text-link back-link" href="{{ url_for('home') }}">{{ icon('left', 16) }}<span>На главную</span></a>
+{{ pageheading('Умный навигатор деканата', 'Опишите ситуацию простыми словами — деканат подберёт регламент под ваш курс, договоры и оценки и даст прямую кнопку действия.') }}
+
+<section class="surface detail-panel navigator-search-card" aria-label="Запрос в навигатор">
+  <form method="get" action="{{ url_for('navigator') }}" class="navigator-form">
+    <div class="navigator-input-row">
+      <input type="search" name="q" value="{{ query }}" data-nav-live-input placeholder="Например: нужно заплатить за общагу, справка в военкомат, заболел перед зачётом, ПГАС…" autocomplete="off">
+      <button type="submit" class="btn btn-primary">Подобрать решение</button>
+      {% if query %}<a class="btn btn-ghost" href="{{ url_for('navigator') }}">Сбросить</a>{% endif %}
+    </div>
+    <div class="chip-row" aria-label="Частые ситуации">
+      <a class="quick-chip" href="{{ url_for('navigator', q='заболел 095') }}">Заболел перед зачётом</a>
+      <a class="quick-chip" href="{{ url_for('navigator', q='военкомат отсрочка') }}">Справка в военкомат</a>
+      <a class="quick-chip" href="{{ url_for('navigator', q='стипендия пгас') }}">Повышенная стипендия</a>
+      <a class="quick-chip" href="{{ url_for('navigator', q='общежитие оплата') }}">Оплатить общежитие</a>
+      <a class="quick-chip" href="{{ url_for('navigator', q='пропустил пару') }}">Пропустил пару</a>
+      <a class="quick-chip" href="{{ url_for('navigator', q='гость коворкинг') }}">Гостевой QR и боксы</a>
+    </div>
+  </form>
+</section>
+
+<div class="navigator-list mt-24">
+  {% for sit in situations %}
+  <article class="surface detail-panel playbook-card" data-nav-card data-nav-keywords="{{ (sit.question ~ ' ' ~ sit.keywords ~ ' ' ~ sit.summary)|lower }}">
+    <div class="detail-head">
+      <div>
+        <h2>{{ sit.question }}</h2>
+        <p class="playbook-summary">{{ sit.summary }}</p>
+      </div>
+      {{ state_badge(sit.badge, sit.badge_tone) }}
+    </div>
+
+    <ol class="playbook-steps">
+      {% for st in sit.steps %}
+      <li>
+        <span class="step-idx num">0{{ loop.index }}</span>
+        <span>{{ st }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+
+    <div class="detail-actions">
+      {% if sit.instant_kind and not sit.instant_label %}
+      <form method="post" action="{{ url_for('request_instant', kind=sit.instant_kind) }}">
+        {{ csrf_field(csrf) }}
+        <input type="hidden" name="nonce" value="{{ instant_nonce }}">
+        <button type="submit" class="btn btn-primary">
+          <span>{{ sit.action_label }}</span>{{ icon('arrow', 16) }}
+        </button>
+      </form>
+      <a class="btn btn-ghost" href="{{ url_for('requests_list') }}#office-slots">Записаться за печатью в А–116</a>
+      {% else %}
+      <a class="btn btn-primary" href="{{ sit.action_url }}">
+        <span>{{ sit.action_label }}</span>{{ icon('arrow', 16) }}
+      </a>
+      {% if sit.instant_kind %}
+      <form method="post" action="{{ url_for('request_instant', kind=sit.instant_kind) }}">
+        {{ csrf_field(csrf) }}
+        <input type="hidden" name="nonce" value="{{ instant_nonce }}">
+        <button type="submit" class="btn btn-ghost">
+          {{ icon('file', 15) }}<span>{{ sit.instant_label }} PDF</span>
+        </button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}

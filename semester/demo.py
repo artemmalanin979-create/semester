@@ -24,8 +24,10 @@ STUDENT_PROFILES = {
         "funding": "Бюджетная основа",
         "languages": "Английский (C1) · Испанский (B2)",
         "advisor": "Е. В. Ларионова · каб. А–118",
-        "pass_zone": "Корпуса А, Б, В · Читальный зал · Лаборатории",
+        "pass_zone": "Корпуса А, Б, В · Студдом № 2 · Читальный зал",
         "pass_valid": "31 августа 2027",
+        "order_no": "№ 418-ст от 26.08.2025",
+        "program_code": "38.03.02 Менеджмент",
     },
     2: {
         "card_number": "23-МО-0412",
@@ -33,8 +35,10 @@ STUDENT_PROFILES = {
         "funding": "Бюджетная основа",
         "languages": "Французский (C1) · Английский (C1)",
         "advisor": "Д. А. Корсаков · каб. В–204",
-        "pass_zone": "Корпуса А, Б, В · Дипломатический читальный зал",
+        "pass_zone": "Корпуса А, Б, В · Студдом № 1 · Дипломатический зал",
         "pass_valid": "31 августа 2027",
+        "order_no": "№ 392-ст от 25.08.2024",
+        "program_code": "41.03.05 Международные отношения",
     },
     3: {
         "card_number": "ST-А116-09",
@@ -44,8 +48,85 @@ STUDENT_PROFILES = {
         "advisor": "Приём студентов: Пн–Пт, 10:00–17:00",
         "pass_zone": "Служебный доступ · Учебный офис А–116",
         "pass_valid": "31 августа 2027",
+        "order_no": "Штатный реестр",
+        "program_code": "Учебный офис",
     },
 }
+
+DORM_INFO = {
+    1: {
+        "building": "Студдом № 2",
+        "address": "Кампус Юго-Запад, корп. 2",
+        "room": "Б–614 (двухместный блок)",
+        "contract": "ОД-24/412",
+        "warden": "Н. П. Громова · каб. 104",
+        "monthly_rub": 3400,
+        "guest_hours": "Ежедневно 09:00–22:00 по разовому QR",
+    },
+    2: {
+        "building": "Студдом № 1",
+        "address": "Кампус Запад, корп. 1",
+        "room": "А–308 (двухместный номер)",
+        "contract": "ОД-23/109",
+        "warden": "А. С. Ветров · каб. 102",
+        "monthly_rub": 3100,
+        "guest_hours": "Ежедневно 09:00–22:00 по разовому QR",
+    },
+}
+
+SCHOLARSHIPS = {
+    1: {
+        "card_mask": "Мир •• 4819",
+        "next_date": "25 ноября",
+        "total_monthly": 10700,
+        "items": (
+            ("Государственная академическая стипендия (ГАС)", 4200, "Назначена по итогам летней сессии"),
+            ("Надбавка за академический рейтинг 90+", 6500, "Топ-15 % потока · осенний семестр"),
+        ),
+        "history": (
+            ("Октябрь 2026", "ГАС + рейтинговая надбавка", 10700, "Выплачено 25.10"),
+            ("Сентябрь 2026", "ГАС + рейтинговая надбавка", 10700, "Выплачено 25.09"),
+            ("Август 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.08"),
+            ("Июль 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.07"),
+            ("Июнь 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.06"),
+            ("Май 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.05"),
+        ),
+    },
+    2: {
+        "card_mask": "Мир •• 9034",
+        "next_date": "25 ноября",
+        "total_monthly": 4200,
+        "items": (
+            ("Государственная академическая стипендия (ГАС)", 4200, "Базовая ставка по итогам сессии"),
+        ),
+        "history": (
+            ("Октябрь 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.10"),
+            ("Сентябрь 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.09"),
+            ("Август 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.08"),
+            ("Июль 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.07"),
+            ("Июнь 2026", "ГАС + проектная премия", 9200, "Выплачено 25.06"),
+            ("Май 2026", "Государственная академическая стипендия", 4200, "Выплачено 25.05"),
+        ),
+    },
+}
+
+# id, student_id, category, title, contract_no, period_label, amount_rub, due_label, initial_status
+INITIAL_CHARGES = (
+    ("chg-1-nov", 1, "Общежитие", "Проживание в Студдоме № 2 (комн. Б–614)", "ОД-24/412", "Ноябрь 2026", 3400, "до 25 ноября", "unpaid"),
+    ("chg-1-oct", 1, "Общежитие", "Проживание в Студдоме № 2 (комн. Б–614)", "ОД-24/412", "Октябрь 2026", 3400, "оплачено 21 октября", "paid"),
+    ("chg-1-lang", 1, "Доп. модуль", "Практикум «Деловой испанский B2–C1»", "ДОП-24/88", "Осенний семестр", 14500, "оплачено 12 октября", "paid"),
+    ("chg-2-nov", 2, "Общежитие", "Проживание в Студдоме № 1 (комн. А–308)", "ОД-23/109", "Ноябрь 2026", 3100, "до 25 ноября", "unpaid"),
+    ("chg-2-dip", 2, "Доп. модуль", "Курс «Дипломатический перевод (французский)»", "ДОП-23/31", "Осенний семестр", 16000, "до 30 ноября", "unpaid"),
+)
+
+STUDY_SPACES = (
+    ("box-k1", "Проектный бокс К–1", "Читальный зал, Корпус А, 2 этаж · 4 места · экран USB-C"),
+    ("box-k2", "Переговорная К–2", "Корпус А, 2 этаж · 6 мест · маркерная стена"),
+    ("media-m1", "Медиастудия М–1", "Корпус Б, 2 этаж · запись презентаций и звонков"),
+)
+
+BOOKING_SLOTS = ("11:35–13:00", "13:35–15:00", "16:00–17:30", "17:30–19:00")
+OFFICE_SLOT_TIMES = ("11:40", "13:40", "15:50", "16:20")
 
 ROOMS = {
     "А–116": ("Корпус А", "1 этаж", "Учебный офис деканата, правое крыло от атриума"),
@@ -65,6 +146,8 @@ ROOMS = {
     "В–412": ("Корпус В", "4 этаж", "Подъём на лифте западного холла корпуса В"),
     "Лаборатория 3": ("Корпус Б", "2 этаж", "Проектный медиаблок рядом с галереей"),
 }
+
+TEACHING_ROOMS = tuple(r for r in ROOMS if r != "А–116")
 
 KIND_SLUGS = {
     "Лекция": "lecture",
@@ -92,7 +175,7 @@ TIMETABLE = {
         (0, "12:00", "13:30", "Семинар", "Маркетинговая аналитика", "Р. К. Белецкий", "Б–408", "А–204"),
         (0, "14:15", "15:45", "Практика", "Дизайн продукта", "Ю. В. Сафронова", "Лаборатория 3", ""),
         (1, "10:00", "11:30", "Семинар", "Экономика фирмы", "И. Н. Грачёв", "А–201", ""),
-        (1, "12:00", "13:30", "Практика", "Методы исследований", "Л. А. Корнеева", "Б–105", ""),
+        (1, "14:15", "15:45", "Практика", "Методы исследований", "Л. А. Корнеева", "Б–105", ""),
         (2, "10:00", "11:30", "Лекция", "Поведение потребителей", "С. Л. Дроздова", "Б–301", ""),
         (2, "12:00", "13:30", "Практика", "Дизайн продукта", "Ю. В. Сафронова", "Лаборатория 3", ""),
         (3, "10:00", "11:30", "Семинар", "Английский язык", "М. С. Ладыгина", "А–416", ""),
@@ -105,6 +188,7 @@ TIMETABLE = {
         (0, "11:00", "12:30", "Семинар", "Теория переговоров", "С. Ю. Рудова", "В–412", "В–213"),
         (0, "13:15", "14:45", "Практика", "Французский язык", "Л. Н. Савельева", "В–309", ""),
         (1, "09:00", "10:30", "Лекция", "Региональные исследования", "В. Т. Мельник", "Б–411", ""),
+        (1, "13:15", "14:45", "Практика", "Французский язык", "Л. Н. Савельева", "В–309", ""),
         (2, "11:00", "12:30", "Семинар", "Международное право", "П. С. Гранов", "А–220", ""),
         (3, "09:00", "10:30", "Практика", "Французский язык", "Л. Н. Савельева", "В–309", ""),
         (3, "11:00", "12:30", "Семинар", "Теория переговоров", "С. Ю. Рудова", "В–213", ""),
@@ -132,11 +216,89 @@ GRADES = {
     ],
 }
 
-REQUEST_TYPES = {
-    "study": ("Справка об обучении", "Подтверждает статус студента, курс, форму обучения и факультет.", "file"),
-    "grades": ("Выписка об успеваемости", "Дисциплины, зачётные единицы и 100-балльный рейтинг за семестр.", "layers"),
-    "appeal": ("Заявление в деканат", "Обращение методисту по учебному плану, расписанию или сессии.", "message"),
+# Instant registry certificates (1-click PDF/QR issuance)
+INSTANT_TYPES = {
+    "study": (
+        "Справка об обучении",
+        "Подтверждает статус студента, курс, очную форму обучения и факультет.",
+        "file",
+    ),
+    "military": (
+        "Справка в военкомат (Прил. № 4)",
+        "Воинский учёт и отсрочка: номер приказа о зачислении, код направления и срок окончания.",
+        "shield",
+    ),
+    "income": (
+        "Справка о стипендии и выплатах",
+        "Помесячная ведомость начислений за 6 месяцев для банка, визы, соцкарты или вычета.",
+        "wallet",
+    ),
+    "grades": (
+        "Выписка об успеваемости",
+        "Дисциплины, зачётные единицы (ЗЕТ) и 100-балльный рейтинг за семестр.",
+        "layers",
+    ),
+    "dorm_cert": (
+        "Справка о проживании в общежитии",
+        "Подтверждение договора найма, корпуса и комнаты в студенческом доме.",
+        "home",
+    ),
 }
+
+# Reviewed petitions routed to the Dean's Office queue (/staff)
+PETITION_TYPES = {
+    "medical": (
+        "Медсправка о болезни (095/у)",
+        "Закрытие пропусков занятий и перенос контрольных точек по уважительной причине.",
+        "clock",
+    ),
+    "pgas": (
+        "Заявка на ПГАС / матпомощь",
+        "Конкурс на повышенную академическую стипендию или разовая социальная поддержка.",
+        "chart",
+    ),
+    "retake": (
+        "Направление на пересдачу",
+        "Запрос электронного экзаменационного листа («бегунка») на пересдачу или добор баллов.",
+        "refresh",
+    ),
+    "appeal": (
+        "Заявление в учебный офис",
+        "Индивидуальный учебный план, смена факультатива, второго языка или перезачёт.",
+        "message",
+    ),
+}
+
+REQUEST_TYPES = {**INSTANT_TYPES, **PETITION_TYPES}
+
+STAFF_PRESETS = (
+    "Согласовано учебным офисом. Изменения отражены в карточке студента.",
+    "Пропуски по медицинской справке закрыты, перенос аттестации согласован.",
+    "Достижения приняты к конкурсу на ПГАС в осеннем семестре.",
+    "Возвращено на доработку: уточните период и реквизиты подтверждающего документа.",
+    "Отклонено: не приложено основание, предусмотренное учебным регламентом.",
+)
+
+PREFILL_TEMPLATES = {
+    "medical": ("Форма 095/у", "Освобождение от учебных занятий по медицинской справке 095/у (поликлиника № 209), прошу перенести контрольную точку на резервный день."),
+    "pgas": ("ПГАС · учебная деятельность", "Прошу включить анкету в конкурс на повышенную государственную академическую стипендию по итогам семестрового рейтинга и проектной работы."),
+    "missed": ("Объяснительная по пропуску занятия", "Прошу учесть уважительную причину пропуска семинара (участие в выездном кейс-этапе от факультета) и разрешить отработку темы."),
+    "curriculum": ("Индивидуальный учебный план", "Прошу согласовать включение профильного факультатива в индивидуальный учебный план осеннего семестра."),
+}
+
+
+def mask_full_name(full_name):
+    """Mask 'Валерия Ильинична Маякова' -> 'Маякова В. И.' for public /verify pages."""
+    parts = [p for p in (full_name or "").split() if p]
+    if len(parts) >= 3:
+        return f"{parts[-1]} {parts[0][0]}. {parts[1][0]}."
+    if len(parts) == 2:
+        return f"{parts[-1]} {parts[0][0]}."
+    return parts[0] if parts else "Обучающийся"
+
+
+def fmt_rub(amount):
+    return f"{amount:,}".replace(",", " ") + " ₽"
 
 
 def now():
@@ -171,16 +333,22 @@ def _minutes(hhmm):
     return hours * 60 + mins
 
 
-def lessons_on(group, day):
+def lessons_on(group, day, overrides=None):
     slot_lookup = {start: idx + 1 for idx, (start, _, _) in enumerate(GROUP_SLOTS[group])}
     items = []
     for weekday, start, end, kind, title, teacher, room, previous in TIMETABLE[group]:
         if weekday != day.weekday():
             continue
+        if overrides and (weekday, start) in overrides:
+            new_room = overrides[(weekday, start)]
+            if new_room != room:
+                previous = previous or room
+                room = new_room
         wing, floor, nav_hint = ROOMS.get(room, ("Кампус", "1 этаж", ""))
         prev_wing = ROOMS.get(previous, ("", "", ""))[0] if previous else ""
         items.append({
             "day": day,
+            "weekday": weekday,
             "start": start,
             "end": end,
             "kind": kind,
@@ -200,45 +368,62 @@ def lessons_on(group, day):
 
 
 def day_gaps(lessons, has_ready_office_doc=False):
-    """Map lesson id -> concise transition or window note shown after that lesson."""
+    """Map lesson id -> concise transition or bookable free-window note shown after that lesson."""
     hints = {}
+    has_window = False
     for idx in range(len(lessons) - 1):
         curr_item = lessons[idx]
         next_item = lessons[idx + 1]
         gap = _minutes(next_item["start"]) - _minutes(curr_item["end"])
         if gap >= 60:
+            has_window = True
             hours, mins = divmod(gap, 60)
             span = f"{hours} ч {mins} мин" if mins else f"{hours} ч"
+            slot_lbl = "11:35–13:00" if _minutes(curr_item["end"]) <= 11 * 60 + 35 else "13:35–15:00"
             note = (
-                "Готовую бумажную справку можно забрать в окне А–116"
+                f"Свободное окно {curr_item['end']}–{next_item['start']} — можно забрать оригинал в А–116 или занять бокс"
                 if has_ready_office_doc
-                else "Читальный зал корпуса А открыт"
+                else f"Свободное окно {curr_item['end']}–{next_item['start']} — проектный бокс К–1 свободен"
             )
             hints[curr_item["id"]] = {
                 "kind": "window",
                 "badge": f"Окно {span}",
                 "text": note,
+                "cta_campus": True,
+                "book_slot": slot_lbl,
+                "book_date": curr_item["day"].isoformat(),
             }
         elif curr_item["wing"] != next_item["wing"]:
             hints[curr_item["id"]] = {
                 "kind": "route",
                 "badge": f"Перерыв {gap} мин",
                 "text": f"{curr_item['wing']} → {next_item['wing']} по галерее 2 этажа (~4 мин)",
+                "cta_campus": False,
+                "book_slot": "",
+                "book_date": "",
             }
-    if lessons and has_ready_office_doc and _minutes(lessons[-1]["end"]) <= 16 * 60 + 30:
-        last_id = lessons[-1]["id"]
-        if last_id not in hints:
-            hints[last_id] = {
-                "kind": "office",
-                "badge": "До 17:00",
-                "text": "Бумажный оригинал справки готов к выдаче в окне А–116",
-            }
+    if lessons and not has_window:
+        last = lessons[-1]
+        last_end = _minutes(last["end"])
+        slot_lbl = "13:35–15:00" if last_end <= 13 * 60 + 35 else "16:00–17:30"
+        hints[last["id"]] = {
+            "kind": "window",
+            "badge": f"Свободно с {last['end']}",
+            "text": (
+                "После пар можно забрать готовую справку в А–116 или занять бокс коворкинга"
+                if has_ready_office_doc
+                else "Окно для командной работы после аудиторных пар"
+            ),
+            "cta_campus": True,
+            "book_slot": slot_lbl,
+            "book_date": last["day"].isoformat(),
+        }
     return hints
 
 
-def next_lesson(group, at):
+def next_lesson(group, at, overrides=None):
     for offset in range(8):
-        for item in lessons_on(group, at.date() + timedelta(days=offset)):
+        for item in lessons_on(group, at.date() + timedelta(days=offset), overrides=overrides):
             if offset or time.fromisoformat(item["end"]) > at.time():
                 return item
     return None
@@ -264,13 +449,14 @@ def academic_results(student, day):
     ]
 
 
-def notices(student, stamp):
+def notices(student, stamp, overrides=None):
     current = stamp.date()
     group = student["student_group"]
     change_day = week_start(current)
     if current.weekday() > 0 or stamp.strftime("%H:%M") >= ("13:30" if student["id"] == 1 else "12:30"):
         change_day += timedelta(days=7)
-    moved = next(item for item in lessons_on(group, change_day) if item["previous"])
+    day_items = lessons_on(group, change_day, overrides=overrides)
+    moved = next((item for item in day_items if item["previous"]), day_items[0])
     checkpoint = min(
         (row for row in academic_results(student["id"], current) if not row["result"]),
         key=lambda row: row["date"],
@@ -308,17 +494,205 @@ def notices(student, stamp):
         {
             "id": "office",
             "kind": "Деканат",
-            "title": "Выдача оригиналов в окне А–116",
+            "title": "Мгновенные справки и запись в окно А–116",
             "body": (
-                "Электронные справки выпускаются в разделе заявок с кодом проверки. "
-                "Бумажные экземпляры с печатью выдаются по будням с 10:00 до 17:00."
+                "Типовые справки (обучение, военкомат Прил. № 4, доходы, проживание) выпускаются онлайн за 1 секунду. "
+                "Для бумажных оригиналов доступна запись по слотам."
             ),
             "date": current,
             "icon": "file",
             "link": "/requests",
-            "action": "К заявкам",
+            "action": "К документам",
         },
     ]
+
+
+def build_navigator_situations(student, snap, charges, dorm, scholar):
+    """Build personalized situation playbooks for the signed-in student."""
+    sid = student["id"]
+    unpaid_dorm = next((c for c in charges if c["category"] == "Общежитие" and c["status"] == "unpaid"), None)
+    paid_dorm = next((c for c in charges if c["category"] == "Общежитие" and c["status"] == "paid"), None)
+    next_exam = snap["upcoming"][0] if snap["upcoming"] else None
+    exam_text = (
+        f"{next_exam['title']} ({fmt_date(next_exam['date'])}, {next_exam['exam_room']})"
+        if next_exam else "все аттестации семестра закрыты"
+    )
+
+    room_code = dorm["room"].split()[0]
+    if unpaid_dorm:
+        dorm_summary = (
+            f"По вашему договору {dorm['contract']} ({dorm['building']}, комн. {room_code}) "
+            f"к оплате {fmt_rub(unpaid_dorm['amount'])} ({unpaid_dorm['due_label']})."
+        )
+        dorm_action_label = f"Перейти к оплате {fmt_rub(unpaid_dorm['amount'])}"
+        dorm_action_url = "/campus#billing-section"
+    else:
+        dorm_summary = (
+            f"Договор {dorm['contract']} ({dorm['building']}, комн. {room_code}) полностью оплачен — "
+            "задолженностей нет, пропуск в общежитие активен."
+        )
+        dorm_action_label = "Открыть квитанцию и договоры"
+        dorm_action_url = f"/campus/receipt/{paid_dorm['id']}" if paid_dorm else "/campus"
+
+    pgas_ok = snap["rating_int"] >= 85
+    pgas_note = (
+        f"Ваш текущий рейтинг {snap['rating_avg']}/100 выше конкурсного порога (85 баллов) — вы проходите на конкурс ПГАС."
+        if pgas_ok
+        else f"Ваш текущий рейтинг {snap['rating_avg']}/100 (порог учебной номинации ПГАС — 85 баллов, доступны научная и общественная номинации)."
+    )
+
+    return [
+        {
+            "slug": "dorm-pay",
+            "keywords": "общага общежитие оплата заплатить договор квитанция долг проживание сбп",
+            "question": "Оплатить общежитие и получить квитанцию",
+            "badge": fmt_rub(unpaid_dorm["amount"]) if unpaid_dorm else "Оплачено",
+            "badge_tone": "warn" if unpaid_dorm else "ok",
+            "summary": dorm_summary,
+            "steps": (
+                "Откройте карточку начисления в разделе «Финансы и кампус» — реквизиты договора подставлены автоматически.",
+                "Выберите СБП (комиссия 0 %) или карту «Мир» и подтвердите платёж в один клик.",
+                "Электронная квитанция с QR-кодом сразу сохранится в реестре и не требует похода к коменданту.",
+            ),
+            "action_label": dorm_action_label,
+            "action_url": dorm_action_url,
+            "instant_kind": None,
+        },
+        {
+            "slug": "military",
+            "keywords": "военкомат отсрочка призыв приложение 4 справка воинский учет армия",
+            "question": "Нужна справка в военкомат для отсрочки",
+            "badge": "За 1 сек",
+            "badge_tone": "ok",
+            "summary": (
+                f"Для отсрочки очной формы ({student['course']} курс, приказ {STUDENT_PROFILES[sid]['order_no']}) "
+                "оформляется справка по Приложению № 4."
+            ),
+            "steps": (
+                "Выпустите электронную справку Приложение № 4 с кодом реестра прямо сейчас кнопкой ниже.",
+                "Если военкомат требует гербовую печать — запишитесь на слот в окно А–116 без живой очереди.",
+                "Возьмите с собой паспорт и удостоверение гражданина, подлежащего призыву.",
+            ),
+            "action_label": "Выпустить Приложение № 4",
+            "action_url": "/requests",
+            "instant_kind": "military",
+        },
+        {
+            "slug": "illness",
+            "keywords": "заболел болезнь медсправка 095 зачет экзамен врач больничный температура",
+            "question": "Заболел перед зачётом или экзаменом",
+            "badge": "Регламент 5 дней",
+            "badge_tone": "",
+            "summary": (
+                f"Ближайшая сдача в вашем плане: {exam_text}. "
+                "Медицинская справка 095/у закрывает пропуски и даёт право на резервный день без потери баллов."
+            ),
+            "steps": (
+                "В течение 5 учебных дней после закрытия больничного подайте заявление «Медсправка 095/у» онлайн.",
+                "Укажите даты освобождения и номер поликлиники — методист снимет отметки пропусков в ведомости.",
+                "Если болезнь совпала с зачётом или экзаменом, резервная дата появится в уведомлениях автоматически.",
+            ),
+            "action_label": "Подать 095/у в 1 клик",
+            "action_url": "/requests/new/medical?prefill=medical",
+            "instant_kind": None,
+        },
+        {
+            "slug": "missed-class",
+            "keywords": "пропустил пару пропуск опоздал отработка объяснительная посещаемость семинар",
+            "question": "Пропустил пару — что делать",
+            "badge": f"Группа {student['student_group']}",
+            "badge_tone": "",
+            "summary": (
+                f"Разовый пропуск семинара не снижает допуск (сейчас ваш средний рейтинг {snap['rating_avg']}/100), "
+                "но при уважительной причине отметку лучше закрыть через учебный офис."
+            ),
+            "steps": (
+                "При болезни оформите форму 095/у; при олимпиаде, кейс-чемпионате или вызове приложите реквизиты письма.",
+                "Отправьте предзаполненное заявление куратору потока в один клик — бумажная объяснительная не нужна.",
+                "Согласуйте тему отработки с преподавателем на ближайшем семинаре или в проектном боксе.",
+            ),
+            "action_label": "Подать заявление в 1 клик",
+            "action_url": "/requests/new/appeal?prefill=missed",
+            "instant_kind": None,
+        },
+        {
+            "slug": "scholarship",
+            "keywords": "стипендия пгас деньги выплата доход матпомощь карта когда придет повышенная",
+            "question": "Хочу повышенную стипендию (ПГАС) или справку о доходах",
+            "badge": fmt_rub(scholar["total_monthly"]) + "/мес",
+            "badge_tone": "ok",
+            "summary": (
+                f"Назначено {fmt_rub(scholar['total_monthly'])} в месяц на карту {scholar['card_mask']} "
+                f"(ближайшее зачисление — {scholar['next_date']}). {pgas_note}"
+            ),
+            "steps": (
+                "Для соцзащиты, визы или банка выпустите помесячную справку о выплатах за 6 месяцев в один клик.",
+                "Для участия в конкурсе ПГАС или получения матпомощи отправьте предзаполненную заявку с достижениями.",
+                "Решение стипендиальной комиссии отобразится в разделе «Уведомления».",
+            ),
+            "action_label": "Подать на ПГАС в 1 клик",
+            "action_url": "/requests/new/pgas?prefill=pgas",
+            "instant_kind": "income",
+            "instant_label": "Справка о доходах",
+        },
+        {
+            "slug": "guest-cowork",
+            "keywords": "гость родители пропуск кампус коворкинг переговорная бронь окно комната",
+            "question": "Привести гостя в кампус или занять переговорную",
+            "badge": "Онлайн-пропуск",
+            "badge_tone": "",
+            "summary": (
+                f"Разовый гостевой QR действует с 09:00 до 22:00 ({dorm['building']} и учебные корпуса А/Б), "
+                "а проектные боксы бронируются под окна между парами."
+            ),
+            "steps": (
+                "Укажите ФИО гостя, дату и корпус — гостевой QR-код сформируется мгновенно.",
+                "На проходной гостю достаточно показать QR с экрана и предъявить паспорт.",
+                "Для командной работы между парами выберите свободный бокс К–1, К–2 или медиастудию М–1.",
+            ),
+            "action_label": "Оформить гостевой QR или бокс",
+            "action_url": "/campus#campus-pass-section",
+            "instant_kind": None,
+        },
+        {
+            "slug": "curriculum",
+            "keywords": "факультатив язык пересдача бегунок план иуп перезачет предмет группа",
+            "question": "Сменить факультатив, второй язык или взять бегунок",
+            "badge": f"Группа {student['student_group']}",
+            "badge_tone": "",
+            "summary": (
+                f"Куратор направления: {STUDENT_PROFILES[sid]['advisor']}. "
+                "Изменения индивидуального плана и направления на пересдачу оформляются без бумажных обходных листов."
+            ),
+            "steps": (
+                "Выберите «Направление на пересдачу» или «Заявление в учебный офис» и укажите дисциплину.",
+                "Методист окна А–116 проверит академическую разницу и пришлёт ответ прямо в карточку заявки.",
+                "После согласования обновлённая дисциплина отразится в вашей зачётной ведомости.",
+            ),
+            "action_label": "Подать заявление в 1 клик",
+            "action_url": "/requests/new/appeal?prefill=curriculum",
+            "instant_kind": None,
+        },
+    ]
+
+
+def match_navigator_query(query, situations):
+    q = (query or "").strip().lower()
+    if not q:
+        return situations
+    tokens = [tok for tok in q.replace("?", " ").replace(",", " ").split() if len(tok) >= 2]
+    scored = []
+    for item in situations:
+        hay = f"{item['question']} {item['keywords']} {item['summary']}".lower()
+        score = sum(3 if tok in item["keywords"] else (2 if tok in hay else 0) for tok in tokens)
+        if q in hay:
+            score += 4
+        if score > 0:
+            scored.append((score, item))
+    if not scored:
+        return situations[:2]
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [item for _, item in scored]
 
 
 def qr_svg_path(seed_text):
@@ -364,7 +738,7 @@ def qr_svg_path(seed_text):
     return "".join(parts)
 
 
-def build_week_ics(student, start_day):
+def build_week_ics(student, start_day, overrides=None):
     """Generate RFC 5545 iCalendar payload for the student's academic week."""
     lines = [
         "BEGIN:VCALENDAR",
@@ -378,7 +752,7 @@ def build_week_ics(student, start_day):
     stamp_utc = datetime.now(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")
     for offset in range(7):
         day = start_day + timedelta(days=offset)
-        for item in lessons_on(student["student_group"], day):
+        for item in lessons_on(student["student_group"], day, overrides=overrides):
             dt_start = f"{day:%Y%m%d}T{item['start'].replace(':', '')}00"
             dt_end = f"{day:%Y%m%d}T{item['end'].replace(':', '')}00"
             note = f"{item['kind']} · Преподаватель: {item['teacher']}"
@@ -387,7 +761,7 @@ def build_week_ics(student, start_day):
             lines.extend([
                 "BEGIN:VEVENT",
                 f"UID:{item['id']}-{student['student_group']}@semester.demo",
-                f"DTSTAMP:{stamp_utc}",
+                "DTSTAMP:" + stamp_utc,
                 f"DTSTART;TZID=Europe/Moscow:{dt_start}",
                 f"DTEND;TZID=Europe/Moscow:{dt_end}",
                 f"SUMMARY:{item['title']} ({item['kind']})",

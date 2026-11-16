@@ -3,7 +3,7 @@
 {% set title, description, glyph = request_types[kind] %}
 {% block title %}{{ title }} · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>Все заявки</span></a>
+<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>Все документы и заявки</span></a>
 {{ pageheading(title, description) }}
 
 <div class="form-split">
@@ -12,7 +12,7 @@
     <input type="hidden" name="nonce" value="{{ nonce }}">
     {% if error %}<p class="form-error" role="alert">{{ icon('info', 17) }}<span>{{ error }}</span></p>{% endif %}
 
-    {% if kind != 'appeal' %}
+    {% if not is_petition %}
     <fieldset class="delivery-fieldset">
       <legend>Способ получения</legend>
       <div class="delivery-options">
@@ -20,26 +20,63 @@
           <input type="radio" name="delivery" value="digital" required{% if selected == 'digital' %} checked{% endif %}>
           <span class="radio-copy">
             <strong>Электронно в кабинете</strong>
-            <small>Документ с матричным кодом проверки откроется на странице заявки и сохраняется в PDF.</small>
+            <small>Документ с матричным кодом проверки и печатной формой PDF.</small>
           </span>
         </label>
         <label class="radio-option">
           <input type="radio" name="delivery" value="office" required{% if selected == 'office' %} checked{% endif %}>
           <span class="radio-copy">
-            <strong>Бумажный оригинал в окне А–116</strong>
-            <small>Выдача с печатью по будням с 10:00 до 17:00 при предъявлении студенческого билета.</small>
+            <strong>Бумажный оригинал с печатью в окне А–116</strong>
+            <small>Выдача по будням с 10:00 до 17:00 при предъявлении студенческого билета.</small>
           </span>
         </label>
       </div>
     </fieldset>
     {% endif %}
 
+    {% if kind == 'retake' %}
     <div class="field-group">
-      <label for="comment">{{ 'Текст заявления' if kind == 'appeal' else 'Комментарий' }}{% if kind != 'appeal' %} <small>необязательно</small>{% endif %}</label>
-      <textarea name="comment" id="comment" rows="4" maxlength="500" placeholder="{{ 'Опишите вопрос методисту деканата (минимум 10 знаков)' if kind == 'appeal' else 'Например: по месту прохождения стажировки' }}"{% if kind == 'appeal' %} required minlength="10"{% endif %}>{{ comment }}</textarea>
+      <label for="subject">Дисциплина семестра</label>
+      <select id="subject" name="subject">
+        {% for disc in disciplines %}
+        <option value="{{ disc }}">{{ disc }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% elif kind == 'pgas' %}
+    <div class="field-group">
+      <label for="subject">Основание выплаты</label>
+      <select id="subject" name="subject">
+        <option value="ПГАС · учебная деятельность">ПГАС · учебная деятельность (рейтинг 85+)</option>
+        <option value="ПГАС · научная деятельность">ПГАС · научно-исследовательская деятельность</option>
+        <option value="ПГАС · проектная деятельность">ПГАС · проектная и общественная деятельность</option>
+        <option value="Материальная помощь">Разовая материальная поддержка</option>
+      </select>
+    </div>
+    {% elif kind == 'medical' %}
+    <div class="field-group">
+      <label for="subject">Тип медицинского документа</label>
+      <select id="subject" name="subject">
+        <option value="Форма 095/у"{% if selected_subject == 'Форма 095/у' %} selected{% endif %}>Справка о временной нетрудоспособности студента (095/у)</option>
+        <option value="Выписка ЕМИАС / КЭК"{% if selected_subject == 'Выписка ЕМИАС / КЭК' %} selected{% endif %}>Электронная выписка поликлиники / заключение КЭК</option>
+      </select>
+    </div>
+    {% elif kind == 'appeal' and selected_subject %}
+    <input type="hidden" name="subject" value="{{ selected_subject }}">
+    {% endif %}
+
+    <div class="field-group">
+      <label for="comment">
+        {% if kind == 'medical' %}Период освобождения и номер медучреждения
+        {% elif kind == 'pgas' %}Перечень достижений или основание
+        {% elif kind == 'retake' %}Причина пересдачи или желаемый поток
+        {% elif is_petition %}Текст заявления
+        {% else %}Комментарий / место требования <small>необязательно</small>{% endif %}
+      </label>
+      <textarea name="comment" id="comment" rows="4" maxlength="500" placeholder="{{ 'Укажите детали для методиста учебного офиса (минимум 10 знаков)' if is_petition else 'Например: по месту прохождения стажировки или в отдел кадров' }}"{% if is_petition %} required minlength="10"{% endif %}>{{ comment }}</textarea>
     </div>
 
-    <p class="form-hint">Конкурсный прототип: указывайте демонстрационные формулировки без личных данных.</p>
+    <p class="form-hint">Конкурсный прототип: указывайте демонстрационные формулировки без настоящих персональных данных.</p>
     <div class="form-actions">
       <button type="submit" class="btn btn-primary"><span>Отправить заявку</span>{{ icon('arrow', 16) }}</button>
     </div>
@@ -50,8 +87,8 @@
     <dl class="mini-dl">
       <div><dt>Заявитель</dt><dd>{{ g.student.full_name }}</dd></div>
       <div><dt>Подразделение</dt><dd>{{ g.student.faculty }}</dd></div>
-      <div><dt>Группа</dt><dd class="num">{{ g.student.student_group }}</dd></div>
-      <div><dt>Окно выдачи</dt><dd>Корпус А, каб. А–116 · Пн–Пт 10:00–17:00</dd></div>
+      <div><dt>Группа и билет</dt><dd class="num">{{ g.student.student_group }} · {{ student_meta.card_number }}</dd></div>
+      <div><dt>Маршрут обработки</dt><dd>{{ 'Рассмотрение методистом А–116' if is_petition else 'Автоматическая сверка с реестром' }}</dd></div>
     </dl>
   </aside>
 </div>

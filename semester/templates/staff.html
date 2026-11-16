@@ -2,144 +2,388 @@
 {% from 'components.html' import icon, csrf_field, pageheading, state_badge %}
 {% block title %}Учебный офис · Семестр{% endblock %}
 {% block content %}
-{{ pageheading('Учебный офис', g.student.faculty ~ ' · окно ' ~ g.student.student_group ~ ' · обработка справок и обращений') }}
+{{ pageheading('Учебный офис', g.student.faculty ~ ' · окно ' ~ g.student.student_group ~ ' · сопровождение потоков ' ~ groups|join(' и ')) }}
 
-<section class="surface metrics-bar metrics-bar-3" aria-label="Сводка учебного офиса">
+<section class="surface metrics-bar" aria-label="Сводка учебного офиса">
   <div class="metric-cell">
     <span class="metric-label">Ожидают решения</span>
     <strong class="metric-value num">{{ pending_total }}</strong>
-    <span class="metric-note">Новые обращения и справки в проверке</span>
+    <span class="metric-note">Заявления и справки в проверке</span>
   </div>
   <div class="metric-cell">
-    <span class="metric-label">Обработано</span>
-    <strong class="metric-value num">{{ ready_total }}</strong>
-    <span class="metric-note">Выпущенные документы и закрытые вопросы</span>
+    <span class="metric-label">Закрыто обращений</span>
+    <strong class="metric-value num">{{ closed_total }}</strong>
+    <span class="metric-note">Выпущенные бланки и решения</span>
   </div>
   <div class="metric-cell">
-    <span class="metric-label">Потоки на сопровождении</span>
-    <strong class="metric-value num">{{ groups|join(' · ') }}</strong>
-    <span class="metric-note">Очные группы бакалавриата</span>
+    <span class="metric-label">Активные переносы пар</span>
+    <strong class="metric-value num">{{ overrides_total }}</strong>
+    <span class="metric-note">Оперативные замены аудиторий</span>
+  </div>
+  <div class="metric-cell">
+    <span class="metric-label">Неоплаченные договоры</span>
+    <strong class="metric-value num">{{ unpaid_total }}</strong>
+    <span class="metric-note">Контроль общежитий и модулей</span>
   </div>
 </section>
 
-<div class="staff-grid">
-  <section aria-labelledby="queue-heading">
-    <div class="section-heading">
-      <div>
-        <h2 id="queue-heading">Очередь обращений</h2>
-        <p>Подтверждение выпуска документов и ответы студентам</p>
+{% if tab == 'queue' %}
+<div class="content-stack">
+  <div class="staff-main-grid">
+    <section aria-labelledby="queue-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="queue-heading">Очередь обращений студентов</h2>
+          <p>Согласование заявлений (095/у, ПГАС, ИУП, пересдачи) и контроль выпуска</p>
+        </div>
+        <div class="seg" data-seg data-staff-filters data-count="3" data-index="0" hidden role="tablist" aria-label="Фильтр очереди">
+          <span class="seg-thumb" aria-hidden="true"></span>
+          <button type="button" class="seg-item is-active" data-staff-filter="all" data-seg-idx="0">Все ({{ queue|length }})</button>
+          <button type="button" class="seg-item" data-staff-filter="pending" data-seg-idx="1">В работе ({{ pending_total }})</button>
+          <button type="button" class="seg-item" data-staff-filter="closed" data-seg-idx="2">Закрыто ({{ closed_total }})</button>
+        </div>
       </div>
-      <div class="seg" data-seg data-staff-filters data-count="3" data-index="0" hidden role="tablist" aria-label="Фильтр очереди">
-        <span class="seg-thumb" aria-hidden="true"></span>
-        <button type="button" class="seg-item is-active" data-staff-filter="all" data-seg-idx="0">Все ({{ queue|length }})</button>
-        <button type="button" class="seg-item" data-staff-filter="pending" data-seg-idx="1">В работе ({{ pending_total }})</button>
-        <button type="button" class="seg-item" data-staff-filter="ready" data-seg-idx="2">Готово ({{ ready_total }})</button>
-      </div>
-    </div>
 
-    <div class="surface boxed-list staff-queue-list">
-      {% for item in queue %}
-      <article class="staff-item" data-staff-state="{{ 'ready' if item.ready else 'pending' }}">
-        <div class="staff-item-head">
-          <div class="staff-item-title">
-            <span class="row-glyph">{{ icon(item.icon, 18) }}</span>
-            <div>
-              <strong>{{ item.title }}</strong>
-              <small>{{ item.student_name }} · <span class="num">{{ item.student_group }}</span> · <span class="num">#{{ item.id[:8]|upper }}</span> · {{ fmt_dt(item.created_at) }}</small>
+      <div class="surface boxed-list staff-queue-list">
+        {% for item in queue %}
+        <article class="staff-item" data-staff-state="{{ 'closed' if item.closed else 'pending' }}">
+          <div class="staff-item-head">
+            <div class="staff-item-title">
+              <span class="row-glyph">{{ icon(item.icon, 18) }}</span>
+              <div>
+                <strong>{{ item.title }}</strong>
+                <small>{{ item.student_name }} · <span class="num">{{ item.student_group }}</span> · {{ item.student_faculty }} · <span class="num">#{{ item.id[:8]|upper }}</span> · {{ fmt_dt(item.created_at) }}</small>
+              </div>
             </div>
+            {{ state_badge(item.status, item.tone) }}
           </div>
-          {{ state_badge(item.status, 'ok' if item.ready else 'warn') }}
-        </div>
 
-        <div class="staff-item-meta">
-          <span>Формат выдачи: <strong>{{ delivery[item.delivery] }}</strong></span>
-        </div>
+          <div class="staff-item-meta">
+            <span>Формат: <strong>{{ 'Электронное решение' if item.is_petition else delivery[item.delivery] }}</strong></span>
+          </div>
 
-        {% if item.comment %}
-        <p class="staff-comment">{{ item.comment }}</p>
-        {% endif %}
+          {% if item.comment %}
+          <p class="staff-comment">{{ item.comment }}</p>
+          {% endif %}
 
-        {% if item.staff_note %}
-        <p class="staff-reply-note"><strong>Ответ деканата:</strong> {{ item.staff_note }}</p>
-        {% endif %}
+          {% if item.staff_note %}
+          <p class="staff-reply-note {{ 'is-returned' if (item.returned or item.rejected) else '' }}">
+            <strong>{{ 'Причина возврата:' if item.returned else ('Причина отклонения:' if item.rejected else 'Решение офиса:') }}</strong> {{ item.staff_note }}
+          </p>
+          {% endif %}
 
-        {% if not item.ready %}
-        <form method="post" action="{{ url_for('staff_resolve_request', request_id=item.id) }}" class="staff-resolve-form">
-          {{ csrf_field(csrf) }}
-          <input type="text" name="staff_note" maxlength="400" placeholder="{{ 'Официальный ответ студенту по обращению…' if item.kind == 'appeal' else 'Комментарий к выпуску (необязательно)…' }}" aria-label="Комментарий методиста">
-          <button type="submit" class="btn btn-primary compact">
-            {{ icon('check', 15) }}<span>{{ 'Ответить и закрыть' if item.kind == 'appeal' else 'Подтвердить выпуск' }}</span>
-          </button>
-        </form>
-        {% endif %}
-      </article>
-      {% else %}
-      <p class="empty">Очередь обращений пуста.</p>
-      {% endfor %}
-    </div>
-  </section>
-
-  <aside class="staff-side-stack" id="announce-box">
-    <section class="surface detail-panel staff-announce-card" aria-labelledby="announce-heading">
-      <div class="card-subhead">
-        <h2 id="announce-heading">Объявление потоку</h2>
-        <p>Сообщение сразу появится в центре уведомлений выбранной группы.</p>
-      </div>
-
-      <form method="post" action="{{ url_for('staff_announce') }}" class="announce-form">
-        {{ csrf_field(csrf) }}
-        <div class="form-row-2">
-          <div class="field-group">
-            <label for="target_group">Адресат</label>
-            <select id="target_group" name="target_group">
-              {% for grp in groups %}
-              <option value="{{ grp }}">Группа {{ grp }}</option>
+          {% if not item.closed %}
+          <form method="post" action="{{ url_for('staff_resolve_request', request_id=item.id) }}" class="staff-resolve-block">
+            {{ csrf_field(csrf) }}
+            <div class="preset-chips" aria-label="Быстрые шаблоны ответа">
+              {% for preset in presets %}
+              <button type="button" class="quick-chip" data-preset-text="{{ preset }}">{{ preset[:40] }}{% if preset|length > 40 %}…{% endif %}</button>
               {% endfor %}
-              <option value="all">Все учебные группы</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label for="kind">Рубрика</label>
-            <select id="kind" name="kind">
-              <option value="Расписание">Расписание</option>
-              <option value="Деканат">Деканат</option>
-              <option value="Сессия">Сессия</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label for="announce_title">Заголовок</label>
-          <input type="text" id="announce_title" name="title" minlength="4" maxlength="120" placeholder="Например: Перенос консультации на 16:00" required>
-        </div>
-
-        <div class="field-group">
-          <label for="announce_body">Текст уведомления</label>
-          <textarea id="announce_body" name="body" rows="3" minlength="8" maxlength="400" placeholder="Укажите аудиторию, время и необходимые детали для студентов…" required></textarea>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-full">Опубликовать уведомление</button>
-      </form>
+            </div>
+            <div class="staff-resolve-row">
+              <input type="text" name="staff_note" maxlength="400" placeholder="Официальный ответ или комментарий для студента…" aria-label="Комментарий методиста">
+              <div class="staff-resolve-btns">
+                <button type="submit" name="decision" value="approved" class="btn btn-primary compact">
+                  {{ icon('check', 15) }}<span>Одобрить</span>
+                </button>
+                <button type="submit" name="decision" value="returned" class="btn btn-ghost compact">
+                  <span>На доработку</span>
+                </button>
+                <button type="submit" name="decision" value="rejected" class="btn btn-ghost compact">
+                  <span>Отклонить</span>
+                </button>
+              </div>
+            </div>
+          </form>
+          {% endif %}
+        </article>
+        {% else %}
+        <p class="empty">Очередь обращений пуста — все заявления студентов обработаны.</p>
+        {% endfor %}
+      </div>
     </section>
 
-    {% if published %}
-    <section class="surface side-info-card" aria-labelledby="published-heading">
-      <h2 class="side-card-title" id="published-heading">Опубликованные объявления</h2>
-      <div class="published-list">
-        {% for row in published %}
-        <div class="published-item">
-          <div class="published-meta">
-            <span class="num">{{ 'Все группы' if row.target_group == 'all' else row.target_group }}</span>
-            <span class="sep">·</span>
-            <span>{{ row.kind }}</span>
+    <div class="staff-side-stack">
+      <section aria-labelledby="quick-override-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="quick-override-heading">Быстрый перенос аудитории</h2>
+            <p>Замена в 2 клика с мгновенным уведомлением группе</p>
           </div>
-          <strong>{{ row.title }}</strong>
-          <p>{{ row.body }}</p>
+          <a class="text-link" href="{{ url_for('staff_schedule') }}"><span>Все пары</span>{{ icon('arrow', 14) }}</a>
+        </div>
+        <div class="surface detail-panel">
+          <form method="post" action="{{ url_for('staff_set_override') }}" class="announce-form">
+            {{ csrf_field(csrf) }}
+            <input type="hidden" name="origin" value="dashboard">
+            <div class="field-group">
+              <label for="slot_combo">Группа и занятие</label>
+              <select id="slot_combo" name="slot_combo">
+                {% for qs in quick_slots %}
+                <option value="{{ qs.value }}">{{ qs.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-row-2">
+              <div class="field-group">
+                <label for="quick_room">Новая аудитория</label>
+                <select id="quick_room" name="new_room">
+                  {% for rcode in teaching_rooms %}
+                  <option value="{{ rcode }}"{% if rcode == 'Б–302' %} selected{% endif %}>{{ rcode }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="quick_note">Причина <small>необяз.</small></label>
+                <input type="text" id="quick_note" name="note" maxlength="120" placeholder="Ремонт проектора">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Перенести и уведомить группу</button>
+          </form>
+        </div>
+      </section>
+
+      <section aria-labelledby="slots-staff-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="slots-staff-heading">Очный приём (окно А–116)</h2>
+            <p>Талоны выдачи бумажных оригиналов</p>
+          </div>
+        </div>
+        <div class="surface boxed-list">
+          {% for ap in office_appointments %}
+          <div class="box-row">
+            <span class="row-glyph">{{ icon('clock', 18) }}</span>
+            <span class="row-copy">
+              <strong>Талон <span class="num">{{ ap.ticket_code }}</span> · {{ ap.student_name }}</strong>
+              <small><span class="num">{{ ap.student_group }}</span> · {{ ap.topic }} · <span class="num">{{ ap.visit_date }} в {{ ap.slot_time }}</span></small>
+            </span>
+            {{ state_badge('Активен', 'ok') }}
+          </div>
+          {% else %}
+          <p class="empty">На ближайшие слоты окна А–116 очных записей пока нет.</p>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+{% elif tab == 'schedule' %}
+<div class="content-stack">
+  <div class="aligned-two-col">
+    <section aria-labelledby="override-list-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="override-list-heading">Сетка занятий группы</h2>
+          <p>Оперативная замена аудитории сразу обновляет расписание и .ics студентов</p>
+        </div>
+        <div class="seg" data-count="2" data-index="{{ 0 if selected_group == groups[0] else 1 }}" role="group" aria-label="Выбор группы">
+          <span class="seg-thumb" aria-hidden="true"></span>
+          {% for grp in groups %}
+          <a class="seg-item{% if selected_group == grp %} is-active{% endif %}" href="{{ url_for('staff_schedule', group=grp) }}">{{ grp }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="surface boxed-list">
+        {% for row in group_lessons %}
+        <div class="staff-item">
+          <div class="staff-item-head">
+            <div>
+              <strong>{{ row.day_name }} · <span class="num">{{ row.start }}–{{ row.end }}</span> · {{ row.title }}</strong>
+              <small>{{ row.kind }} · {{ row.teacher }}</small>
+            </div>
+            {% if row.override_id %}
+            <span class="num warn-text"><del>{{ row.base_room }}</del> → <strong>{{ row.active_room }}</strong></span>
+            {% else %}
+            <strong class="num">{{ row.active_room }}</strong>
+            {% endif %}
+          </div>
+
+          <div class="staff-resolve-row">
+            <form method="post" action="{{ url_for('staff_set_override') }}" class="override-inline-form">
+              {{ csrf_field(csrf) }}
+              <input type="hidden" name="student_group" value="{{ selected_group }}">
+              <input type="hidden" name="weekday" value="{{ row.weekday }}">
+              <input type="hidden" name="start_time" value="{{ row.start }}">
+              <select name="new_room" aria-label="Новая аудитория">
+                {% for rcode in teaching_rooms %}
+                <option value="{{ rcode }}"{% if rcode == row.active_room %} selected{% endif %}>{{ rcode }}</option>
+                {% endfor %}
+              </select>
+              <input type="text" name="note" maxlength="140" placeholder="Причина (например: ремонт проектора)">
+              <button type="submit" class="btn btn-ghost compact">Применить</button>
+            </form>
+            {% if row.override_id %}
+            <form method="post" action="{{ url_for('staff_clear_override', override_id=row.override_id) }}">
+              {{ csrf_field(csrf) }}
+              <button type="submit" class="btn btn-ghost compact">Сбросить</button>
+            </form>
+            {% endif %}
+          </div>
         </div>
         {% endfor %}
       </div>
     </section>
-    {% endif %}
-  </aside>
+
+    <section aria-labelledby="active-overrides-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="active-overrides-heading">Журнал активных замен</h2>
+          <p>Все действующие переносы аудиторий по потокам</p>
+        </div>
+      </div>
+
+      <div class="surface boxed-list">
+        {% for ov in overrides %}
+        <div class="box-row">
+          <span class="row-glyph">{{ icon('arrow-swap', 18) }}</span>
+          <span class="row-copy">
+            <strong>Группа <span class="num">{{ ov.student_group }}</span> · {{ weekdays[ov.weekday] }}, <span class="num">{{ ov.start_time }}</span> → <span class="num warn-text">{{ ov.new_room }}</span></strong>
+            <small>{{ ov.note or 'Оперативная замена учебного офиса' }} · {{ fmt_dt(ov.updated_at) }}</small>
+          </span>
+          <form method="post" action="{{ url_for('staff_clear_override', override_id=ov.id) }}">
+            {{ csrf_field(csrf) }}
+            <button type="submit" class="btn btn-ghost compact">Вернуть</button>
+          </form>
+        </div>
+        {% else %}
+        <p class="empty">Дополнительных ручных замен сейчас нет — действует базовое расписание семестра.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
 </div>
+
+{% elif tab == 'students' %}
+<div class="content-stack">
+  <section aria-labelledby="roster-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="roster-heading">Реестр студентов на сопровождении</h2>
+        <p>Академический рейтинг, закрытые кредиты, договоры общежития и обращения</p>
+      </div>
+    </div>
+
+    <div class="surface boxed-list">
+      {% for st in roster %}
+      <article class="staff-item">
+        <div class="staff-item-head">
+          <div class="staff-item-title">
+            <span class="avatar">{{ st.name.split()[0][0] }}{{ st.name.split()[1][0] }}</span>
+            <div>
+              <strong>{{ st.full_name }}</strong>
+              <small>{{ st.faculty }} · {{ st.course }} курс · группа <span class="num">{{ st.group }}</span> · билет <span class="num">{{ st.card_number }}</span></small>
+            </div>
+          </div>
+          <div class="heading-inline">
+            {{ state_badge('Рейтинг ' ~ st.snap.rating_avg ~ ' (' ~ st.snap.rating_letter ~ ')', 'ok') }}
+            {% if st.unpaid_sum %}
+              {{ state_badge('К оплате ' ~ fmt_rub(st.unpaid_sum), 'warn') }}
+            {% else %}
+              {{ state_badge('Договоры оплачены', 'ok') }}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="summary-kv-row">
+          <div>
+            <small>Зачётные единицы</small>
+            <strong class="num">{{ st.snap.earned_credits }}/{{ st.snap.total_credits }} ЗЕТ · ср. {{ st.snap.average }}</strong>
+          </div>
+          <div>
+            <small>Общежитие</small>
+            <strong>{{ st.dorm.building }} · <span class="num">{{ st.dorm.room.split()[0] }}</span></strong>
+          </div>
+          <div>
+            <small>Стипендия и заявки</small>
+            <strong class="num">{{ fmt_rub(st.scholar.total_monthly) }}/мес · в работе: {{ st.open_reqs }}</strong>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+{% elif tab == 'notices' %}
+<div class="content-stack" id="announce-box">
+  <div class="aligned-two-col">
+    <section aria-labelledby="announce-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="announce-heading">Новое объявление потоку</h2>
+          <p>Мгновенная доставка в центр уведомлений выбранной группы</p>
+        </div>
+      </div>
+
+      <div class="surface detail-panel">
+        <form method="post" action="{{ url_for('staff_announce') }}" class="announce-form">
+          {{ csrf_field(csrf) }}
+          <div class="form-row-2">
+            <div class="field-group">
+              <label for="target_group">Адресат</label>
+              <select id="target_group" name="target_group">
+                {% for grp in groups %}
+                <option value="{{ grp }}">Группа {{ grp }}</option>
+                {% endfor %}
+                <option value="all">Все учебные группы</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="kind">Рубрика</label>
+              <select id="kind" name="kind">
+                <option value="Расписание">Расписание</option>
+                <option value="Деканат">Деканат</option>
+                <option value="Сессия">Сессия</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="announce_title">Заголовок</label>
+            <input type="text" id="announce_title" name="title" minlength="4" maxlength="120" placeholder="Например: Приём документов на ПГАС до пятницы" required>
+          </div>
+
+          <div class="field-group">
+            <label for="announce_body">Текст уведомления</label>
+            <textarea id="announce_body" name="body" rows="4" minlength="8" maxlength="400" placeholder="Укажите аудиторию, сроки и порядок действий для студентов…" required></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full">Опубликовать уведомление</button>
+        </form>
+      </div>
+    </section>
+
+    <section aria-labelledby="published-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="published-heading">Опубликованные объявления</h2>
+          <p>Активные сообщения в ленте студентов</p>
+        </div>
+      </div>
+
+      <div class="surface boxed-list">
+        {% for row in published %}
+        <div class="box-row">
+          <span class="row-glyph">{{ icon('bell', 18) }}</span>
+          <span class="row-copy">
+            <strong>{{ row.title }}</strong>
+            <small><span class="num">{{ 'Все группы' if row.target_group == 'all' else row.target_group }}</span> · {{ row.kind }} · {{ fmt_dt(row.created_at) }}</small>
+            <span class="notice-body">{{ row.body }}</span>
+          </span>
+          <form method="post" action="{{ url_for('staff_delete_notice', notice_id=row.id) }}">
+            {{ csrf_field(csrf) }}
+            <button type="submit" class="btn btn-ghost compact">Снять</button>
+          </form>
+        </div>
+        {% else %}
+        <p class="empty">Опубликованных объявлений пока нет.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

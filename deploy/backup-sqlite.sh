@@ -2,8 +2,8 @@
 # Онлайн-бэкап тома SQLite (безопасно при включённом WAL, без остановки Gunicorn).
 set -euo pipefail
 
-APP_DIR="${SEMESTER_APP_DIR:-/opt/semester}"
-BACKUP_DIR="${SEMESTER_BACKUP_DIR:-/var/backups/semester}"
+APP_DIR="${SEMESTER_APP_DIR:-/opt/semestr}"
+BACKUP_DIR="${SEMESTER_BACKUP_DIR:-/var/backups/semestr}"
 RETENTION_DAYS="${SEMESTER_RETENTION_DAYS:-14}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 

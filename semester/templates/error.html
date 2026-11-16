@@ -1,11 +1,28 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon %}
+{% from 'components.html' import icon, mark %}
 {% block title %}{{ title }} · Семестр{% endblock %}
 {% block content %}
-<section class="surface detail-panel error-panel">
-  <p class="num error-code">Ошибка {{ status }}</p>
-  <h1>{{ title }}</h1>
-  <p>{{ message }}</p>
-  <a class="btn btn-primary" href="{{ url_for(home_endpoint if g.student else 'login') }}"><span>Вернуться в кабинет</span>{{ icon('arrow', 16) }}</a>
-</section>
+<div class="{% if not g.student %}verify-standalone{% endif %}">
+  {% if not g.student %}
+  <header class="verify-public-head">
+    <a class="brand" href="{{ url_for('login') }}">
+      {{ mark() }}
+      <span>Семестр</span>
+    </a>
+  </header>
+  {% endif %}
+  <section class="surface detail-panel error-panel">
+    <p class="num error-code">Код ответа {{ status }}</p>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="detail-actions">
+      <a class="btn btn-primary" href="{{ url_for(home_endpoint if g.student else 'login') }}">
+        <span>{{ 'Вернуться в кабинет' if g.student else 'К странице входа' }}</span>{{ icon('arrow', 16) }}
+      </a>
+    </div>
+    {% if not g.student %}
+    <p class="doc-disclaimer">{{ concept_notice }}</p>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

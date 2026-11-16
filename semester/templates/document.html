@@ -1,25 +1,37 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, mark, qr_code %}
+{% from 'components.html' import icon, mark, qr_code, csrf_field, state_badge %}
 {% block title %}{{ item.title }} · Документ · Семестр{% endblock %}
 {% block content %}
 <div class="doc-toolbar no-print">
-  <a class="text-link back-link" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('left', 16) }}<span>К заявке</span></a>
-  <button type="button" class="btn btn-primary compact" data-print hidden>{{ icon('print', 16) }}<span>Печать или PDF</span></button>
+  <a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>К документам</span></a>
+  <div class="heading-inline">
+    <a class="btn btn-ghost compact" href="{{ url_for('verify_document', token=item.verify_token) }}">
+      {{ icon('shield', 15) }}<span>Страница проверки QR</span>
+    </a>
+    {% if not item.revoked %}
+    <form method="post" action="{{ url_for('revoke_document', request_id=item.id) }}">
+      {{ csrf_field(csrf) }}
+      <button type="submit" class="btn btn-ghost compact">{{ icon('close', 14) }}<span>Отозвать</span></button>
+    </form>
+    {% endif %}
+    <button type="button" class="btn btn-primary compact" data-print hidden>{{ icon('print', 16) }}<span>Печать / PDF</span></button>
+  </div>
 </div>
 
 <article class="surface document-sheet">
+  <div class="doc-watermark" aria-hidden="true">{{ 'ОТОЗВАНО · ДЕМО' if item.revoked else 'ОБРАЗЕЦ / ДЕМО' }}</div>
   <header class="doc-letterhead">
     <div class="doc-org">
       {{ mark() }}
       <div>
         <strong>Цифровой деканат «Семестр»</strong>
-        <span>Учебный реестр демонстрационного кампуса</span>
+        <span>Единый реестр студенческих документов (демо-контур)</span>
       </div>
     </div>
     <div class="doc-meta-box">
-      <span>Демонстрационный образец</span>
+      {{ state_badge('Отозвана' if item.revoked else 'ОБРАЗЕЦ / ДЕМО', 'err' if item.revoked else '') }}
       <b class="num">Исх. № {{ verify_code }}</b>
-      <small>от {{ fmt_dt(item.ready_at) }}</small>
+      <small>от {{ fmt_dt(item.ready_at) }} · до {{ valid_until }}</small>
     </div>
   </header>
 
@@ -27,12 +39,12 @@
     <h1>{{ item.title }}</h1>
 
     <p class="doc-statement">
-      Подтверждается, что <strong>{{ g.student.full_name }}</strong> является обучающимся {{ g.student.course }} курса очной формы обучения
-      подразделения «{{ g.student.faculty }}» по направлению подготовки «{{ g.student.program }}», учебная группа <strong class="num">{{ g.student.student_group }}</strong>
-      (студенческий билет <span class="num">{{ student_meta.card_number }}</span>).
+      Выдана обучающемуся <strong>{{ g.student.full_name }}</strong> ({{ g.student.course }} курс, очная форма обучения,
+      подразделение «{{ g.student.faculty }}», программа «{{ g.student.program }}», учебная группа <strong class="num">{{ g.student.student_group }}</strong>,
+      студенческий билет <span class="num">{{ student_meta.card_number }}</span>).
     </p>
 
-    {% if records %}
+    {% if item.kind == 'grades' and records %}
     <div class="doc-table-wrap">
       <table class="doc-table">
         <thead>
@@ -57,10 +69,49 @@
         </tbody>
       </table>
     </div>
+    {% elif item.kind == 'income' and scholar %}
+    <div class="doc-table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th scope="col">Расчётный период</th>
+            <th scope="col">Вид стипендии / выплаты</th>
+            <th scope="col">Сумма</th>
+            <th scope="col">Статус перечисления</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for period_lbl, kind_lbl, amount_val, paid_lbl in scholar.history %}
+          <tr>
+            <td>{{ period_lbl }}</td>
+            <td>{{ kind_lbl }}</td>
+            <td class="num"><strong>{{ fmt_rub(amount_val) }}</strong></td>
+            <td>{{ paid_lbl }} ({{ scholar.card_mask }})</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% elif item.kind == 'military' %}
+    <dl class="doc-kv-grid">
+      <div><dt>Форма справки</dt><dd>Приложение № 4 (воинский учёт обучающихся очной формы)</dd></div>
+      <div><dt>Приказ о зачислении</dt><dd class="num">{{ student_meta.order_no }}</dd></div>
+      <div><dt>Код и направление</dt><dd>{{ student_meta.program_code }}</dd></div>
+      <div><dt>Государственная аккредитация</dt><dd>Действующая очная программа бакалавриата</dd></div>
+      <div><dt>Нормативный срок окончания</dt><dd>До {{ student_meta.pass_valid }}</dd></div>
+      <div><dt>Военно-учётный стол</dt><dd>Корпус В, каб. В–102 · предоставляется по месту учёта</dd></div>
+    </dl>
+    {% elif item.kind == 'dorm_cert' and dorm %}
+    <dl class="doc-kv-grid">
+      <div><dt>Объект размещения</dt><dd>{{ dorm.building }} ({{ dorm.address }})</dd></div>
+      <div><dt>Жилое помещение</dt><dd class="num">{{ dorm.room }}</dd></div>
+      <div><dt>Договор найма</dt><dd class="num">№ {{ dorm.contract }}</dd></div>
+      <div><dt>Основание проживания</dt><dd>Очное обучение, период до {{ student_meta.pass_valid }}</dd></div>
+    </dl>
     {% else %}
     <dl class="doc-kv-grid">
       <div><dt>Форма и основа</dt><dd>{{ student_meta.degree }} · {{ student_meta.funding|lower }}</dd></div>
-      <div><dt>Языковая подготовка</dt><dd>{{ student_meta.languages }}</dd></div>
+      <div><dt>Приказ о зачислении</dt><dd class="num">{{ student_meta.order_no }}</dd></div>
       <div><dt>Нормативный срок</dt><dd>До {{ student_meta.pass_valid }}</dd></div>
       <div><dt>Назначение справки</dt><dd>{{ item.comment or 'По месту требования' }}</dd></div>
     </dl>
@@ -77,12 +128,12 @@
         </div>
       </div>
       <p class="doc-disclaimer">
-        Документ сформирован автоматически в конкурсном прототипе МГИМО × AI-CHALLENGE на вымышленных данных и не имеет юридической силы.
+        {{ concept_notice }} Настоящей юридической силы бланк не имеет.
       </p>
     </div>
-    <div class="doc-qr">
+    <a class="doc-qr" href="{{ url_for('verify_document', token=item.verify_token) }}" aria-label="Открыть публичную страницу проверки подлинности справки">
       {{ qr_code(doc_qr, 84) }}
-    </div>
+    </a>
   </footer>
 </article>
 {% endblock %}

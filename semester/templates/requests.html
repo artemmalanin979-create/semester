@@ -1,55 +1,152 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pageheading, request_row %}
-{% block title %}Заявки · Семестр{% endblock %}
+{% from 'components.html' import icon, csrf_field, pageheading, request_row, state_badge %}
+{% block title %}Документы и заявки · Семестр{% endblock %}
 {% block content %}
-{{ pageheading('Заявки и справки', 'Электронные документы с проверочным кодом, оригиналы в окно А–116 и обращения в учебный офис.') }}
+{% call pageheading('Документы и учебный офис', 'Мгновенный выпуск реестровых справок с QR-кодом, подача заявлений и запись в окно А–116 без очереди.') %}
+  <a class="btn btn-ghost compact" href="{{ url_for('navigator') }}">
+    {{ icon('compass', 16) }}<span>Какая справка нужна?</span>
+  </a>
+{% endcall %}
 
-<section aria-labelledby="catalog-heading">
+<section aria-labelledby="instant-heading">
   <div class="section-heading">
     <div>
-      <h2 id="catalog-heading">Оформить обращение</h2>
-      <p>Выберите документ или заявление</p>
+      <h2 id="instant-heading">Мгновенные справки из реестра</h2>
+      <p>Формируются за 1 секунду в электронном виде с кодом проверки или заказываются с печатью в А–116</p>
     </div>
   </div>
-  <div class="catalog-grid">
-    {% for kind, (title, description, glyph) in request_types.items() %}
-    <a class="surface catalog-card" href="{{ url_for('request_new', kind=kind) }}">
+  <div class="catalog-grid catalog-grid-instant">
+    {% for kind, (title, description, glyph) in instant_types.items() %}
+    <article class="surface catalog-card catalog-card-static">
       <div class="catalog-card-top">
         <span class="row-glyph">{{ icon(glyph, 20) }}</span>
-        <span class="state">{{ 'Учебный офис' if kind == 'appeal' else 'Онлайн · А–116' }}</span>
+        {{ state_badge('За 1 сек · QR', 'ok') }}
       </div>
       <div class="catalog-card-body">
         <strong>{{ title }}</strong>
         <p>{{ description }}</p>
       </div>
-      <div class="catalog-card-foot">
-        <span>Оформить</span>
-        {{ icon('arrow', 15) }}
+      <div class="catalog-card-actions">
+        <form method="post" action="{{ url_for('request_instant', kind=kind) }}">
+          {{ csrf_field(csrf) }}
+          <input type="hidden" name="nonce" value="{{ instant_nonce }}">
+          <button type="submit" class="btn btn-primary compact">
+            <span>Выпустить PDF</span>{{ icon('arrow', 14) }}
+          </button>
+        </form>
+        <a class="text-link" href="{{ url_for('request_new', kind=kind) }}">Оригинал в А–116</a>
       </div>
-    </a>
+    </article>
     {% endfor %}
   </div>
 </section>
 
-<section class="content-stack" aria-labelledby="history-heading">
-  <div class="section-heading">
-    <div>
-      <h2 id="history-heading">История заявок</h2>
-      <p>Выпущенные справки и поданные заявления</p>
+<section class="content-stack" aria-labelledby="petitions-heading">
+  <div>
+    <div class="section-heading">
+      <div>
+        <h2 id="petitions-heading">Заявления на рассмотрение деканата</h2>
+        <p>Болезнь 095/у, повышенная стипендия ПГАС, пересдачи и индивидуальный учебный план</p>
+      </div>
+    </div>
+    <div class="catalog-grid catalog-grid-2">
+      {% for kind, (title, description, glyph) in petition_types.items() %}
+      <a class="surface catalog-card" href="{{ url_for('request_new', kind=kind) }}">
+        <div class="catalog-card-top">
+          <span class="row-glyph">{{ icon(glyph, 20) }}</span>
+          {{ state_badge('Учебный офис') }}
+        </div>
+        <div class="catalog-card-body">
+          <strong>{{ title }}</strong>
+          <p>{{ description }}</p>
+        </div>
+        <div class="catalog-card-foot">
+          <span>Заполнить заявление</span>
+          {{ icon('arrow', 15) }}
+        </div>
+      </a>
+      {% endfor %}
     </div>
   </div>
-  <div class="surface boxed-list">
-    {% for item in items %}
-      {{ request_row(item, fmt_dt) }}
-    {% else %}
-      <p class="empty">Заявок пока нет.</p>
-    {% endfor %}
+
+  <div class="slot-grid" id="office-slots">
+    <section aria-labelledby="slot-book-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="slot-book-heading">Запись в окно А–116 по времени</h2>
+          <p>Получение бумажных оригиналов с гербовой печатью без живой очереди</p>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('book_office_slot') }}" class="surface detail-panel slot-form-card">
+        {{ csrf_field(csrf) }}
+        <div class="form-row-3">
+          <div class="field-group">
+            <label for="visit_date">День визита</label>
+            <select id="visit_date" name="visit_date">
+              {% for d in slot_days %}
+              <option value="{{ d.isoformat() }}">{{ weekdays[d.weekday()] }}, {{ fmt_date(d) }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="slot_time">Слот (перерыв)</label>
+            <select id="slot_time" name="slot_time">
+              {% for t in slot_times %}
+              <option value="{{ t }}">{{ t }} МСК</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="slot_topic">Цель визита</label>
+            <input type="text" id="slot_topic" name="topic" maxlength="120" placeholder="Оригинал Приложения № 4">
+          </div>
+        </div>
+        <div class="slot-submit-row">
+          <span class="form-hint">Корпус А, 1 этаж, каб. А–116 · при себе иметь студенческий билет</span>
+          <button type="submit" class="btn btn-ghost compact">{{ icon('calendar', 15) }}<span>Взять талон</span></button>
+        </div>
+      </form>
+
+      {% if my_slots %}
+      <div class="surface boxed-list mt-12">
+        {% for sl in my_slots %}
+        <div class="box-row">
+          <span class="row-glyph">{{ icon('clock', 18) }}</span>
+          <span class="row-copy">
+            <strong>Талон <span class="num">{{ sl.ticket_code }}</span> · {{ sl.topic }}</strong>
+            <small class="num">{{ sl.visit_date }} в {{ sl.slot_time }} · окно А–116</small>
+          </span>
+          <form method="post" action="{{ url_for('cancel_office_slot', slot_id=sl.id) }}">
+            {{ csrf_field(csrf) }}
+            <button type="submit" class="btn btn-ghost compact">Отменить</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
   </div>
-  {% if page > 1 or more %}
-  <nav class="pagination" aria-label="Страницы заявок">
-    {% if page > 1 %}<a class="btn btn-ghost compact" href="{{ url_for('requests_list', page=page - 1) }}">{{ icon('left', 16) }}<span>Назад</span></a>{% endif %}
-    {% if more %}<a class="btn btn-ghost compact" href="{{ url_for('requests_list', page=page + 1) }}"><span>Дальше</span>{{ icon('chevron', 16) }}</a>{% endif %}
-  </nav>
-  {% endif %}
+
+  <div aria-labelledby="history-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="history-heading">История документов и заявлений</h2>
+        <p>Все выпущенные справки и поданные обращения</p>
+      </div>
+    </div>
+    <div class="surface boxed-list">
+      {% for item in items %}
+        {{ request_row(item, fmt_dt) }}
+      {% else %}
+        <p class="empty">Заявок пока нет.</p>
+      {% endfor %}
+    </div>
+    {% if page > 1 or more %}
+    <nav class="pagination mt-12" aria-label="Страницы заявок">
+      {% if page > 1 %}<a class="btn btn-ghost compact" href="{{ url_for('requests_list', page=page - 1) }}">{{ icon('left', 16) }}<span>Назад</span></a>{% endif %}
+      {% if more %}<a class="btn btn-ghost compact" href="{{ url_for('requests_list', page=page + 1) }}"><span>Дальше</span>{{ icon('chevron', 16) }}</a>{% endif %}
+    </nav>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}

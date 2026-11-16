@@ -61,11 +61,41 @@
           {% endfor %}
         </div>
       </section>
+      {% else %}
+      <section class="demo-switcher" aria-labelledby="demo-heading-prod">
+        <div class="demo-switcher-head">
+          <span id="demo-heading-prod">Тестовые логины стенда</span>
+          <small>подстановка почты</small>
+        </div>
+        <div class="boxed-list demo-cards">
+          <button type="button" class="demo-account-btn" data-demo-email="lera@demo.example" aria-label="Подставить почту Валерии Маяковой">
+            <span class="demo-account-copy">
+              <strong>Валерия Маякова</strong>
+              <small class="num">lera@demo.example · Маркетинг, 2 курс</small>
+            </span>
+            <span class="num demo-code">МП-24-1</span>
+          </button>
+          <button type="button" class="demo-account-btn" data-demo-email="misha@demo.example" aria-label="Подставить почту Михаила Ратникова">
+            <span class="demo-account-copy">
+              <strong>Михаил Ратников</strong>
+              <small class="num">misha@demo.example · МО, 3 курс</small>
+            </span>
+            <span class="num demo-code">МО-23-2</span>
+          </button>
+          <button type="button" class="demo-account-btn" data-demo-email="dean@demo.example" aria-label="Подставить почту учебного офиса">
+            <span class="demo-account-copy">
+              <strong>Елена Орлова</strong>
+              <small class="num">dean@demo.example · Учебный офис</small>
+            </span>
+            <span class="num demo-code">А–116</span>
+          </button>
+        </div>
+      </section>
       {% endif %}
     </section>
 
-    <footer class="login-footer">
-      Конкурсный прототип МГИМО × AI-CHALLENGE. Все учебные профили и документы созданы для демонстрации.
+    <footer class="login-footer" role="contentinfo">
+      {{ concept_notice }}
     </footer>
   </div>
 

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, mark, qr_code, state_badge %}
+{% block title %}Квитанция {{ charge.receipt_code }} · Семестр{% endblock %}
+{% block content %}
+<div class="doc-toolbar no-print">
+  <a class="text-link back-link" href="{{ url_for('campus') }}">{{ icon('left', 16) }}<span>Финансы и кампус</span></a>
+  <button type="button" class="btn btn-primary compact" data-print hidden>{{ icon('print', 16) }}<span>Печать или PDF</span></button>
+</div>
+
+<article class="surface document-sheet">
+  <div class="doc-watermark" aria-hidden="true">ОБРАЗЕЦ / ДЕМО</div>
+  <header class="doc-letterhead">
+    <div class="doc-org">
+      {{ mark() }}
+      <div>
+        <strong>Цифровой деканат «Семестр» · Расчётный контур</strong>
+        <span>Электронная квитанция об оплате договора (демо-образец)</span>
+      </div>
+    </div>
+    <div class="doc-meta-box">
+      {{ state_badge('Оплачено', 'ok') }}
+      <b class="num">Квитанция № {{ charge.receipt_code }}</b>
+      <small>от {{ fmt_dt(charge.paid_at) }}</small>
+    </div>
+  </header>
+
+  <div class="doc-body">
+    <h1>Подтверждение платежа</h1>
+    <p class="doc-statement">
+      Принят платёж от обучающегося <strong>{{ g.student.full_name }}</strong> (группа <strong class="num">{{ g.student.student_group }}</strong>,
+      студенческий билет <span class="num">{{ student_meta.card_number }}</span>) по договору <strong class="num">№ {{ charge.contract_no }}</strong>.
+    </p>
+
+    <dl class="doc-kv-grid">
+      <div><dt>Назначение платежа</dt><dd>{{ charge.title }}</dd></div>
+      <div><dt>Расчётный период</dt><dd>{{ charge.period_label }}</dd></div>
+      <div><dt>Сумма операции</dt><dd class="num"><strong>{{ fmt_rub(charge.amount) }}</strong> (комиссия 0 ₽)</dd></div>
+      <div><dt>Способ оплаты</dt><dd>{{ charge.payment_method }}</dd></div>
+      <div><dt>Подразделение учёта</dt><dd>{{ dorm.building ~ ' · Управление общежитий' if charge.category == 'Общежитие' else g.student.faculty }}</dd></div>
+      <div><dt>Статус в реестре</dt><dd>Зачислено в полном объёме</dd></div>
+    </dl>
+  </div>
+
+  <footer class="doc-verification">
+    <div class="doc-stamp">
+      <div class="stamp-badge">
+        {{ icon('shield', 18) }}
+        <div>
+          <strong>Отметка платёжного реестра «Семестр»</strong>
+          <small class="num">Код операции: {{ charge.receipt_code }} · Владелец ID {{ g.student.id }}</small>
+        </div>
+      </div>
+      <p class="doc-disclaimer">
+        {{ concept_notice }} Оплата имитируется — реальные денежные переводы не производятся.
+      </p>
+    </div>
+    <div class="doc-qr">
+      {{ qr_code(receipt_qr, 84) }}
+    </div>
+  </footer>
+</article>
+{% endblock %}

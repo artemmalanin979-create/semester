@@ -2,7 +2,7 @@
 {% from 'components.html' import icon, csrf_field, pageheading, qr_code, state_badge %}
 {% block title %}Профиль · Семестр{% endblock %}
 {% block content %}
-{{ pageheading('Профиль', 'Карточка сотрудника учебного офиса и электронный пропуск кампуса.' if is_staff else 'Учебная карточка студента, зачётные сведения и электронный пропуск кампуса.') }}
+{{ pageheading('Профиль', 'Карточка сотрудника учебного офиса и электронный пропуск кампуса.' if is_staff else 'Учебная карточка студента, сведения о зачислении и электронный пропуск кампуса.') }}
 
 <div class="profile-grid">
   <section class="surface detail-panel profile-panel" aria-labelledby="dossier-heading">
@@ -21,12 +21,13 @@
       {% if is_staff %}
       <div><dt>Окно приёма</dt><dd class="num">{{ g.student.student_group }}</dd></div>
       <div><dt>Режим работы</dt><dd>{{ student_meta.funding }}</dd></div>
-      <div><dt>Зона ответственности</dt><dd>{{ student_meta.advisor }}</dd></div>
+      <div><dt>График приёма</dt><dd>{{ student_meta.advisor }}</dd></div>
       {% else %}
       <div><dt>Курс и группа</dt><dd>{{ g.student.course }} курс · <span class="num">{{ g.student.student_group }}</span></dd></div>
-      <div><dt>Форма обучения</dt><dd>{{ student_meta.degree }} ({{ student_meta.funding|lower }})</dd></div>
+      <div><dt>Форма и приказ</dt><dd>{{ student_meta.degree }} ({{ student_meta.order_no }})</dd></div>
       <div><dt>Иностранные языки</dt><dd>{{ student_meta.languages }}</dd></div>
       <div><dt>Куратор курса</dt><dd>{{ student_meta.advisor }}</dd></div>
+      <div><dt>Проживание</dt><dd>{{ dorm.building }} · комн. <span class="num">{{ dorm.room.split()[0] }}</span> (дог. {{ dorm.contract }})</dd></div>
       <div><dt>Текущий рейтинг</dt><dd class="num">{{ snap.rating_avg }} / 100 · ECTS {{ snap.rating_letter }} ({{ snap.earned_credits }} ЗЕТ)</dd></div>
       {% endif %}
     </dl>
@@ -65,11 +66,11 @@
     </section>
 
     <section class="surface side-info-card" aria-labelledby="office-info-heading">
-      <h2 class="side-card-title" id="office-info-heading">Справочная учебного офиса</h2>
+      <h2 class="side-card-title" id="office-info-heading">Единое окно деканата</h2>
       <dl class="mini-dl">
-        <div><dt>Окно выдачи</dt><dd>Корпус А, 1 этаж, каб. А–116</dd></div>
-        <div><dt>Часы приёма</dt><dd class="num">Пн–Пт · 10:00–17:00</dd></div>
-        <div><dt>Электронные справки</dt><dd>Выпуск в кабинете с кодом проверки</dd></div>
+        <div><dt>Учебный офис</dt><dd>Корпус А, 1 этаж, каб. А–116 (Пн–Пт 10:00–17:00)</dd></div>
+        <div><dt>Воинский учёт</dt><dd>Корпус В, каб. В–102 · Приложение № 4 онлайн</dd></div>
+        <div><dt>Управление общежитий</dt><dd>Договоры и оплата СБП в разделе «Финансы и кампус»</dd></div>
       </dl>
     </section>
   </aside>

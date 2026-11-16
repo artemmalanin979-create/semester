@@ -117,21 +117,39 @@
     });
   });
 
-  // One-click demo account fill on /login
+  // One-click demo account fill on /login (supports email+password locally and email-only in prod)
   document.querySelectorAll("[data-demo-email]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const emailInput = document.getElementById("email");
       const passInput = document.getElementById("password");
-      if (!emailInput || !passInput) return;
+      if (!emailInput) return;
       emailInput.value = btn.getAttribute("data-demo-email") || "";
-      passInput.value = btn.getAttribute("data-demo-password") || "";
-      [emailInput, passInput].forEach((el) => {
+      const demoPass = btn.getAttribute("data-demo-password");
+      if (passInput && demoPass) {
+        passInput.value = demoPass;
+      }
+      [emailInput, demoPass ? passInput : null].filter(Boolean).forEach((el) => {
         el.classList.remove("field-filled");
         void el.offsetWidth;
         el.classList.add("field-filled");
       });
-      const submitBtn = document.querySelector("#login-form button[type='submit']");
-      if (submitBtn) submitBtn.focus();
+      if (passInput && !demoPass) {
+        passInput.focus();
+      } else {
+        const submitBtn = document.querySelector("#login-form button[type='submit']");
+        if (submitBtn) submitBtn.focus();
+      }
+    });
+  });
+
+  // Subtle form submission state so double-taps show immediate loading feedback
+  document.querySelectorAll("form[method='post']").forEach((form) => {
+    form.addEventListener("submit", (ev) => {
+      const submitter = ev.submitter || form.querySelector("button[type='submit']");
+      if (submitter && submitter.classList.contains("btn")) {
+        submitter.setAttribute("aria-busy", "true");
+        window.requestAnimationFrame(() => submitter.classList.add("is-submitting"));
+      }
     });
   });
 
@@ -208,6 +226,48 @@
         });
         revealVisibleRows(rows);
       });
+    });
+  }
+
+  // Staff reply preset chips
+  document.querySelectorAll("[data-preset-text]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const form = chip.closest("form");
+      const input = form ? form.querySelector("input[name='staff_note']") : null;
+      if (!input) return;
+      input.value = chip.getAttribute("data-preset-text") || "";
+      input.classList.remove("field-filled");
+      void input.offsetWidth;
+      input.classList.add("field-filled");
+      input.focus();
+    });
+  });
+
+  // Live instant filter on /navigator
+  const navLiveInput = document.querySelector("[data-nav-live-input]");
+  if (navLiveInput) {
+    const cards = document.querySelectorAll("[data-nav-card]");
+    navLiveInput.addEventListener("input", () => {
+      const q = navLiveInput.value.trim().toLowerCase();
+      const tokens = q.split(/\s+/).filter((t) => t.length >= 2);
+      if (!tokens.length) {
+        cards.forEach((c) => {
+          c.hidden = false;
+        });
+        return;
+      }
+      let matchedAny = false;
+      cards.forEach((c) => {
+        const hay = c.getAttribute("data-nav-keywords") || "";
+        const hit = tokens.some((tok) => hay.includes(tok));
+        c.hidden = !hit;
+        if (hit) matchedAny = true;
+      });
+      if (!matchedAny) {
+        cards.forEach((c) => {
+          c.hidden = false;
+        });
+      }
     });
   }
 

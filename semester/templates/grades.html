@@ -1,18 +1,25 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pageheading, state_badge %}
+{% from 'components.html' import icon, csrf_field, pageheading, state_badge %}
 {% block title %}Успеваемость · Семестр{% endblock %}
 {% block content %}
 {% call pageheading('Успеваемость', 'Осенний семестр · группа ' ~ g.student.student_group ~ ' · 100-балльная рейтинговая шкала') %}
-  <a class="btn btn-ghost compact" href="{{ url_for('request_new', kind='grades') }}">
-    {{ icon('layers', 16) }}<span>Заказать выписку</span>
+  <a class="btn btn-ghost compact" href="{{ url_for('request_new', kind='retake') }}">
+    {{ icon('refresh', 15) }}<span>Пересдача / бегунок</span>
   </a>
+  <form method="post" action="{{ url_for('request_instant', kind='grades') }}">
+    {{ csrf_field(csrf) }}
+    <input type="hidden" name="nonce" value="{{ instant_nonce }}">
+    <button type="submit" class="btn btn-primary compact">
+      {{ icon('layers', 15) }}<span>Выписка PDF</span>
+    </button>
+  </form>
 {% endcall %}
 
 <section class="surface metrics-bar" aria-label="Сводка семестра">
   <div class="metric-cell">
     <span class="metric-label">Рейтинг семестра</span>
     <strong class="metric-value num">{{ rating_avg }} <small>/ 100 · {{ rating_letter }}</small></strong>
-    <span class="metric-note">Порог допуска — 70 баллов</span>
+    <span class="metric-note">Порог допуска — 70 баллов · ПГАС от 85</span>
   </div>
   <div class="metric-cell">
     <span class="metric-label">Средний балл</span>
@@ -90,8 +97,9 @@
     <div class="section-heading">
       <div>
         <h2 id="session-heading">Расписание сессии</h2>
-        <p>Зачёты и экзамены с аудиториями</p>
+        <p>Зачёты и экзамены с аудиториями · при болезни подайте справку 095/у в течение 5 дней</p>
       </div>
+      <a class="text-link" href="{{ url_for('request_new', kind='medical') }}"><span>Справка 095/у</span>{{ icon('arrow', 15) }}</a>
     </div>
     <div class="surface boxed-list">
       {% for row in upcoming %}

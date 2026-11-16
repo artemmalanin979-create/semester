@@ -2,7 +2,7 @@
 {% from 'components.html' import icon, state_badge, pageheading %}
 {% block title %}{{ item.title }} · Семестр{% endblock %}
 {% block content %}
-<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>Все заявки</span></a>
+<a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>Все документы и заявки</span></a>
 
 {% call pageheading(item.title, 'Заявка #' ~ item.id[:8]|upper ~ ' · создана ' ~ fmt_dt(item.created_at)) %}
   <button type="button" class="icon-btn bordered" data-copy-text="{{ item.id[:8]|upper }}" aria-label="Скопировать номер заявки" title="Скопировать #{{ item.id[:8]|upper }}">
@@ -17,16 +17,16 @@
         <h2 id="status-heading">Статус обращения</h2>
         <p class="detail-sub">Реестровый номер <span class="num">#{{ item.id[:8]|upper }}</span></p>
       </div>
-      {{ state_badge(item.status, 'ok' if item.ready else 'warn') }}
+      {{ state_badge(item.status, item.tone) }}
     </div>
 
-    {% if not item.ready %}
+    {% if not item.closed %}
     <div class="live-timer-box" data-countdown="{{ item.remaining }}">
       <div class="live-timer-copy">
         <span class="dot warn-dot" aria-hidden="true"></span>
         <div>
-          <strong>Проверка в учебном реестре</strong>
-          <small>Страница обновится автоматически или сразу после решения методиста</small>
+          <strong>{{ 'На рассмотрении в учебном офисе' if item.is_petition else 'Проверка в учебном реестре' }}</strong>
+          <small>Статус обновится автоматически или сразу после решения методиста А–116</small>
         </div>
       </div>
       <span class="num mono-timer" data-countdown-value>
@@ -39,45 +39,53 @@
       <li class="done">
         <span class="timeline-mark">{{ icon('check', 13) }}</span>
         <div>
-          <strong>Заявка принята</strong>
+          <strong>Обращение зарегистрировано</strong>
           <p>{{ fmt_dt(item.created_at) }} · {{ g.student.name }}</p>
         </div>
       </li>
-      <li class="{{ 'done' if item.ready else 'current' }}">
-        <span class="timeline-mark">{{ icon('check' if item.ready else 'clock', 13) }}</span>
+      <li class="{{ 'done' if item.closed else 'current' }}">
+        <span class="timeline-mark">{{ icon('check' if item.closed else 'clock', 13) }}</span>
         <div>
-          <strong>Сверка учебных сведений</strong>
-          <p>{{ 'Формат выдачи — ' ~ delivery[item.delivery]|lower ~ '.' if item.kind != 'appeal' else 'Передано методисту учебного офиса.' }}</p>
+          <strong>{{ 'Рассмотрение методистом окна А–116' if item.is_petition else 'Сверка учебных сведений' }}</strong>
+          <p>{{ 'Формат выдачи — ' ~ delivery[item.delivery]|lower ~ '.' if not item.is_petition else 'Проверка академических оснований и документов.' }}</p>
         </div>
       </li>
-      <li class="{{ 'done' if item.ready else '' }}">
-        <span class="timeline-mark">{{ icon('check', 13) if item.ready else '' }}</span>
+      <li class="{{ 'returned' if (item.returned or item.rejected) else ('done' if item.ready else '') }}">
+        <span class="timeline-mark">{{ icon('info', 13) if (item.returned or item.rejected) else (icon('check', 13) if item.ready else '') }}</span>
         <div>
-          <strong>{{ 'Ответ учебного офиса готов' if item.kind == 'appeal' else 'Документ выпущен' }}</strong>
-          <p>{{ fmt_dt(item.ready_at) if item.ready else 'Ожидаемое время готовности — ' ~ fmt_dt(item.ready_at) }}</p>
+          <strong>
+            {% if item.returned %}Возвращено на уточнение
+            {% elif item.rejected %}Отклонено учебным офисом
+            {% elif item.revoked %}Документ отозван из реестра
+            {% elif item.is_petition %}Решение учебного офиса принято
+            {% else %}Документ выпущен{% endif %}
+          </strong>
+          <p>{{ fmt_dt(item.ready_at) if item.closed else 'Ожидаемое время ответа — ' ~ fmt_dt(item.ready_at) }}</p>
         </div>
       </li>
     </ol>
 
     {% if item.comment %}
     <div class="request-comment">
-      <strong>Текст обращения</strong>
+      <strong>Сведения заявителя</strong>
       <p>{{ item.comment }}</p>
     </div>
     {% endif %}
 
     {% if item.staff_note %}
-    <div class="request-comment staff-reply">
-      <strong>Комментарий учебного офиса</strong>
+    <div class="request-comment {{ 'staff-returned' if (item.returned or item.rejected) else 'staff-reply' }}">
+      <strong>{{ 'Замечание учебного офиса' if item.returned else ('Причина отклонения' if item.rejected else 'Ответ учебного офиса') }}</strong>
       <p>{{ item.staff_note }}</p>
     </div>
     {% endif %}
 
     <div class="detail-actions">
-      {% if item.ready %}
-        {% if item.kind == 'appeal' %}
+      {% if item.returned or item.rejected %}
+        <a class="btn btn-primary" href="{{ url_for('request_new', kind=item.kind) }}"><span>Подать новое обращение</span>{{ icon('arrow', 16) }}</a>
+      {% elif item.ready %}
+        {% if item.is_petition %}
           {% if not item.staff_note %}
-          <p class="callout">{{ icon('message', 18) }}<span><strong>Ответ методиста.</strong> Обращение рассмотрено в демонстрационном контуре, запись внесена в карточку студента.</span></p>
+          <p class="callout">{{ icon('message', 18) }}<span><strong>Согласовано учебным офисом.</strong> Решение внесено в учебную карточку студента.</span></p>
           {% endif %}
         {% elif item.delivery == 'office' %}
           <p class="callout">{{ icon('pin', 18) }}<span>Бумажный оригинал готов к выдаче в окне <strong>А–116</strong> (Корпус А, 1 этаж) по будням с 10:00 до 17:00.</span></p>
@@ -94,7 +102,7 @@
     <h2 class="side-card-title">Сводка</h2>
     <dl class="mini-dl">
       <div><dt>Тип</dt><dd>{{ item.title }}</dd></div>
-      <div><dt>Выдача</dt><dd>{{ delivery[item.delivery] }}</dd></div>
+      <div><dt>Формат</dt><dd>{{ 'Решение в кабинете' if item.is_petition else delivery[item.delivery] }}</dd></div>
       <div><dt>Группа</dt><dd class="num">{{ g.student.student_group }}</dd></div>
       <div><dt>Доступ</dt><dd>Только владелец профиля</dd></div>
     </dl>

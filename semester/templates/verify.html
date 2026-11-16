@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, mark, csrf_field, state_badge %}
+{% block title %}Проверка справки {{ verify_code }} · Семестр{% endblock %}
+{% block content %}
+<div class="{% if not g.student %}verify-standalone{% endif %}">
+  {% if not g.student %}
+  <header class="verify-public-head">
+    <a class="brand" href="{{ url_for('login') }}">
+      {{ mark() }}
+      <span>Семестр · Реестр справок</span>
+    </a>
+    <a class="btn btn-ghost compact" href="{{ url_for('login') }}">Вход в кабинет</a>
+  </header>
+  {% else %}
+  <a class="text-link back-link" href="{{ url_for('staff_dashboard' if is_staff else 'requests_list') }}">
+    {{ icon('left', 16) }}<span>{{ 'К очереди обращений' if is_staff else 'К документам' }}</span>
+  </a>
+  {% endif %}
+
+  <article class="surface detail-panel verify-card">
+    <div class="detail-head">
+      <div>
+        <p class="detail-sub num">Реестровый номер {{ verify_code }}</p>
+        <h1>{{ doc_title }}</h1>
+      </div>
+      {% if is_revoked %}
+        {{ state_badge('Документ отозван', 'err') }}
+      {% else %}
+        {{ state_badge('Подлинность подтверждена', 'ok') }}
+      {% endif %}
+    </div>
+
+    {% if is_revoked %}
+    <p class="form-error" role="status">
+      {{ icon('info', 17) }}
+      <span>Действие данной справки прекращено владельцем или учебным офисом ({{ revoked_at }}). Документ недействителен для предъявления.</span>
+    </p>
+    {% else %}
+    <p class="callout">
+      {{ icon('shield', 18) }}
+      <span>Запись найдена в электронном реестре «Семестр». Персональные данные получателя частично скрыты для публичной проверки по QR-коду.</span>
+    </p>
+    {% endif %}
+
+    <dl class="doc-kv-grid">
+      <div><dt>Обучающийся (маска ФИО)</dt><dd><strong>{{ masked_name }}</strong></dd></div>
+      <div><dt>Статус документа</dt><dd>{{ 'Отозван (' ~ revoked_at ~ ')' if is_revoked else 'Действителен' }}</dd></div>
+      <div><dt>Подразделение</dt><dd>{{ faculty }}</dd></div>
+      <div><dt>Курс и программа</dt><dd>{{ course }} курс · {{ program }}</dd></div>
+      <div><dt>Дата выпуска</dt><dd class="num">{{ issued_at }}</dd></div>
+      <div><dt>Срок действия</dt><dd class="num">{{ 'Прекращён' if is_revoked else 'До ' ~ valid_until }}</dd></div>
+    </dl>
+
+    {% if can_revoke %}
+    <div class="detail-actions">
+      <form method="post" action="{{ url_for('revoke_document', request_id=doc_id) }}">
+        {{ csrf_field(csrf) }}
+        <button type="submit" class="btn btn-ghost">
+          {{ icon('close', 15) }}<span>Отозвать справку</span>
+        </button>
+      </form>
+      {% if not is_staff %}
+      <a class="btn btn-primary" href="{{ url_for('request_document', request_id=doc_id) }}">
+        <span>Открыть полный бланк</span>{{ icon('arrow', 16) }}
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <p class="doc-disclaimer">{{ concept_notice }}</p>
+  </article>
+</div>
+{% endblock %}

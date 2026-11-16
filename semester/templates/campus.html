@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading, qr_code, state_badge %}
+{% block title %}Финансы и кампус · Семестр{% endblock %}
+{% block content %}
+{% call pageheading('Финансы и кампус', 'Оплата проживания в общежитии и учебных модулей, стипендиальные выплаты, гостевые пропуска и бронь коворкинга.') %}
+  <form method="post" action="{{ url_for('request_instant', kind='dorm_cert') }}">
+    {{ csrf_field(csrf) }}
+    <input type="hidden" name="nonce" value="{{ instant_nonce }}">
+    <button type="submit" class="btn btn-ghost compact">
+      {{ icon('file', 15) }}<span>Справка о проживании</span>
+    </button>
+  </form>
+{% endcall %}
+
+<p class="callout sim-banner">
+  {{ icon('info', 18) }}
+  <span><strong>Демонстрационный режим:</strong> оплата по СБП / «Мир», начисления стипендий и гостевые QR-пропуска имитируются для конкурса — реальные платёжные шлюзы не подключены.</span>
+</p>
+
+<section class="surface metrics-bar" aria-label="Финансовая сводка">
+  <div class="metric-cell">
+    <span class="metric-label">К оплате по договорам</span>
+    <strong class="metric-value num">{{ fmt_rub(unpaid_total) }}</strong>
+    <span class="metric-note">{{ 'Комиссия СБП — 0 %' if unpaid_total else 'Все начисления закрыты' }}</span>
+  </div>
+  <div class="metric-cell">
+    <span class="metric-label">Стипендия в месяц</span>
+    <strong class="metric-value num">{{ fmt_rub(scholar.total_monthly) }}</strong>
+    <span class="metric-note">Выплата {{ scholar.next_date }} · {{ scholar.card_mask }}</span>
+  </div>
+  <div class="metric-cell">
+    <span class="metric-label">Общежитие</span>
+    <strong class="metric-value">{{ dorm.building }}</strong>
+    <span class="metric-note num">Комн. {{ dorm.room.split()[0] }} · дог. {{ dorm.contract }}</span>
+  </div>
+  <div class="metric-cell">
+    <span class="metric-label">Активности кампуса</span>
+    <strong class="metric-value num">{{ guest_passes|length + my_bookings|length }}</strong>
+    <span class="metric-note">Гостевых пропусков и броней аудиторий</span>
+  </div>
+</section>
+
+<div class="content-stack">
+  <section id="billing-section" aria-labelledby="billing-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="billing-heading">Договоры и оплата</h2>
+        <p>Начисления за проживание в общежитии и дополнительные образовательные модули</p>
+      </div>
+    </div>
+
+    <div class="surface boxed-list">
+      {% for ch in charges %}
+      <article class="charge-row">
+        <div class="charge-info">
+          <div class="heading-inline">
+            <strong>{{ ch.title }}</strong>
+            {{ state_badge('Оплачено' if ch.status == 'paid' else 'К оплате', 'ok' if ch.status == 'paid' else 'warn') }}
+          </div>
+          <p class="lesson-meta">
+            <span>{{ ch.category }}</span>
+            <span class="sep">·</span>
+            <span class="num">Договор {{ ch.contract_no }}</span>
+            <span class="sep">·</span>
+            <span>{{ ch.period_label }} ({{ ch.due_label }})</span>
+          </p>
+        </div>
+
+        <div class="charge-amount num">
+          <strong>{{ fmt_rub(ch.amount) }}</strong>
+        </div>
+
+        <div class="charge-actions">
+          {% if ch.status == 'unpaid' %}
+          <form method="post" action="{{ url_for('campus_pay', charge_id=ch.id) }}" class="pay-inline-form">
+            {{ csrf_field(csrf) }}
+            <select name="method" aria-label="Способ оплаты">
+              <option value="sbp">СБП · 0 %</option>
+              <option value="mir">Карта «Мир»</option>
+            </select>
+            <button type="submit" class="btn btn-primary compact">
+              <span>Оплатить</span>{{ icon('arrow', 14) }}
+            </button>
+          </form>
+          {% else %}
+          <a class="btn btn-ghost compact" href="{{ url_for('campus_receipt', charge_id=ch.id) }}">
+            {{ icon('file', 15) }}<span>Квитанция</span>
+          </a>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section id="scholarship-section" aria-labelledby="scholar-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="scholar-heading">Стипендии и выплаты</h2>
+        <p>Назначенные ежемесячные начисления и справка о доходах</p>
+      </div>
+      <div class="heading-inline">
+        <form method="post" action="{{ url_for('request_instant', kind='income') }}">
+          {{ csrf_field(csrf) }}
+          <input type="hidden" name="nonce" value="{{ instant_nonce }}">
+          <button type="submit" class="btn btn-ghost compact">{{ icon('download', 15) }}<span>Справка о доходах PDF</span></button>
+        </form>
+        <a class="btn btn-ghost compact" href="{{ url_for('request_new', kind='pgas') }}">Подать на ПГАС</a>
+      </div>
+    </div>
+
+    <div class="surface boxed-list">
+      {% for name_lbl, amount_val, sub_note in scholar['items'] %}
+      <div class="box-row">
+        <span class="row-glyph">{{ icon('wallet', 18) }}</span>
+        <span class="row-copy">
+          <strong>{{ name_lbl }}</strong>
+          <small>{{ sub_note }} · перечисление {{ scholar.next_date }} на {{ scholar.card_mask }}</small>
+        </span>
+        <strong class="num">{{ fmt_rub(amount_val) }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="aligned-two-col">
+    <section id="campus-pass-section" aria-labelledby="guest-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="guest-heading">Общежитие и гостевой пропуск</h2>
+          <p>{{ dorm.building }}, {{ dorm.room }} · {{ dorm.guest_hours }}</p>
+        </div>
+      </div>
+
+      <div class="surface detail-panel">
+        <dl class="mini-dl compact-dl">
+          <div><dt>Адрес размещения</dt><dd>{{ dorm.building }} · {{ dorm.address }}, {{ dorm.room }}</dd></div>
+          <div><dt>Комендант корпуса</dt><dd>{{ dorm.warden }}</dd></div>
+        </dl>
+
+        <form method="post" action="{{ url_for('campus_guest_pass') }}" class="announce-form pt-top">
+          {{ csrf_field(csrf) }}
+          <div class="field-group">
+            <label for="guest_name">ФИО гостя (по паспорту)</label>
+            <input type="text" id="guest_name" name="guest_name" minlength="5" maxlength="100" placeholder="Например: Маяков Илья Сергеевич" required>
+          </div>
+          <div class="form-row-2">
+            <div class="field-group">
+              <label for="guest_date">Дата визита</label>
+              <select id="guest_date" name="visit_date">
+                {% for d in booking_days %}
+                <option value="{{ d.isoformat() }}">{{ fmt_date(d) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="guest_loc">Корпус прохода</label>
+              <select id="guest_loc" name="location">
+                <option value="{{ dorm.building }}">{{ dorm.building }}</option>
+                <option value="Учебный корпус А">Учебный корпус А</option>
+                <option value="Учебный корпус Б">Учебный корпус Б</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">Выпустить гостевой QR-пропуск</button>
+        </form>
+
+        {% if guest_passes %}
+        <div class="guest-pass-list">
+          {% for gp in guest_passes %}
+          <div class="guest-pass-item">
+            <div class="guest-qr-mini">{{ qr_code(gp.qr, 56) }}</div>
+            <div class="row-copy">
+              <strong>{{ gp.guest_name }}</strong>
+              <small><span class="num">{{ gp.code }}</span> · {{ gp.location }} · <span class="num">{{ gp.visit_date }}</span></small>
+            </div>
+            <form method="post" action="{{ url_for('campus_revoke_guest', pass_id=gp.id) }}">
+              {{ csrf_field(csrf) }}
+              <button type="submit" class="btn btn-ghost compact">Отозвать</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section id="cowork-section" aria-labelledby="cowork-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="cowork-heading">Переговорные и коворкинг</h2>
+          <p>Бронирование проектных боксов между парами</p>
+        </div>
+      </div>
+
+      <div class="surface detail-panel">
+        <form method="post" action="{{ url_for('campus_book_room') }}" class="announce-form">
+          {{ csrf_field(csrf) }}
+          <div class="field-group">
+            <label for="space_id">Пространство</label>
+            <select id="space_id" name="space_id">
+              {% for sid_key, stitle, smeta in spaces %}
+              <option value="{{ sid_key }}">{{ stitle }} — {{ smeta }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-row-2">
+            <div class="field-group">
+              <label for="booking_date">День</label>
+              <select id="booking_date" name="booking_date">
+                {% for d in booking_days %}
+                <option value="{{ d.isoformat() }}">{{ weekdays[d.weekday()] }}, {{ fmt_date(d) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="slot_label">Тайм-слот</label>
+              <select id="slot_label" name="slot_label">
+                {% for sl in booking_slots %}
+                <option value="{{ sl }}">{{ sl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="field-group">
+            <label for="purpose">Тема встречи <small>необязательно</small></label>
+            <input type="text" id="purpose" name="purpose" maxlength="120" placeholder="Командный проект / подготовка к семинару">
+          </div>
+          <button type="submit" class="btn btn-ghost btn-full">Забронировать слот</button>
+        </form>
+
+        {% if my_bookings %}
+        <div class="guest-pass-list">
+          {% for bk in my_bookings %}
+          <div class="guest-pass-item">
+            <span class="row-glyph">{{ icon('door', 18) }}</span>
+            <div class="row-copy">
+              <strong>{{ bk.space_title }}</strong>
+              <small><span class="num">{{ bk.booking_date }} · {{ bk.slot_label }}</span> · {{ bk.purpose }}</small>
+            </div>
+            <form method="post" action="{{ url_for('campus_cancel_room', booking_id=bk.id) }}">
+              {{ csrf_field(csrf) }}
+              <button type="submit" class="btn btn-ghost compact">Отменить</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
