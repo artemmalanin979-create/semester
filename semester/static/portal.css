@@ -44,7 +44,7 @@
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sidebar-w: 240px;
   --topbar-h: 60px;
-  --maxw: 1120px;
+  --maxw: 1180px;
   --ease: cubic-bezier(.22, 1, .36, 1);
 }
 
@@ -1460,18 +1460,19 @@ body.signed-in {
 
 .week-matrix {
   display: grid;
-  grid-template-columns: 92px repeat(5, minmax(0, 1fr));
+  grid-template-columns: 80px repeat(5, minmax(0, 1fr));
 }
 
 .matrix-corner,
 .matrix-day-head {
-  padding: 12px;
+  padding: 11px 12px;
   border-bottom: 1px solid var(--line);
   background: var(--bg-soft);
+  min-width: 0;
 }
 
 .matrix-corner {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--dim);
   display: flex;
   align-items: center;
@@ -1492,6 +1493,9 @@ body.signed-in {
 .matrix-day-head span {
   font-size: 12px;
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .matrix-day-head strong {
@@ -1503,12 +1507,13 @@ body.signed-in {
 }
 
 .matrix-time-cell {
-  padding: 12px;
+  padding: 10px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--bg-soft);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .slot-caption {
@@ -1526,22 +1531,26 @@ body.signed-in {
 }
 
 .matrix-cell {
-  padding: 8px;
+  padding: 6px;
   border-left: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line-soft);
   min-width: 0;
+  overflow: hidden;
   display: flex;
 }
 
 .matrix-card {
   width: 100%;
-  padding: 10px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 9px 10px;
   border-radius: 10px;
   border: 1px solid var(--line-soft);
   background: var(--bg-soft);
   display: flex;
   flex-direction: column;
   gap: 5px;
+  overflow: hidden;
   transition: border-color .15s var(--ease), background .15s var(--ease);
 }
 
@@ -1556,30 +1565,37 @@ body.signed-in {
 
 .matrix-card-top {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 6px;
-  font-size: 11.5px;
+  gap: 2px 6px;
+  font-size: 11px;
+  min-width: 0;
 }
 
 .matrix-kind {
   color: var(--muted);
+  min-width: 0;
 }
 
 .matrix-room {
   font-weight: 600;
+  max-width: 100%;
   white-space: nowrap;
 }
 
 .matrix-card h3 {
-  font-size: 13px;
+  font-size: 12.8px;
   line-height: 1.28;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .matrix-teacher {
   font-size: 11.5px;
   color: var(--dim);
   margin-top: auto;
+  overflow-wrap: break-word;
 }
 
 .matrix-empty {
@@ -1603,13 +1619,13 @@ body.signed-in {
   gap: 24px;
 }
 
-@media (min-width: 961px) {
+@media (min-width: 1081px) {
   .week-mobile-stack {
     display: none;
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1080px) {
   .week-matrix-wrap {
     display: none;
   }
