@@ -556,7 +556,7 @@ def create_app(config=None):
     def login():
         if g.student:
             return redirect(url_for("staff_dashboard" if is_staff() else "home"), code=303)
-        if request.method == "GET":
+        if request.method != "POST":
             return render_template("login.html", error=None, email="")
         email = request.form.get("email", "").strip().lower()[:254]
         password = request.form.get("password", "")
@@ -901,7 +901,7 @@ def create_app(config=None):
         if kind not in REQUEST_TYPES:
             abort(404)
         is_pet = kind in PETITION_TYPES
-        if request.method == "GET":
+        if request.method != "POST":
             prefill_key = request.args.get("prefill", "")
             prefill_subj, prefill_body = PREFILL_TEMPLATES.get(prefill_key, ("", ""))
             return render_template(
