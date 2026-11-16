@@ -98,6 +98,112 @@ class PortalTest(unittest.TestCase):
         self.login(restarted)
         self.assertEqual(restarted.get(first.location).status_code, 200)
 
+    def test_instant_certificates_issue_immediately_with_specialized_sheets(self):
+        self.login()
+        reqs_page = self.browser.get("/requests")
+        res = self.browser.post("/requests/instant/military", data={
+            "_csrf": token(reqs_page),
+            "nonce": token(reqs_page, "nonce"),
+        })
+        self.assertEqual(res.status_code, 303)
+        doc_path = urlsplit(res.location).path
+        self.assertTrue(doc_path.endswith("/document"))
+        doc_html = self.browser.get(doc_path).get_data(as_text=True)
+        self.assertIn("Приложение № 4", doc_html)
+        self.assertIn("38.03.02 Менеджмент", doc_html)
+
+        # Income statement contains 6-month payout table
+        reqs_page2 = self.browser.get("/requests")
+        inc_res = self.browser.post("/requests/instant/income", data={
+            "_csrf": token(reqs_page2),
+            "nonce": token(reqs_page2, "nonce"),
+        })
+        inc_html = self.browser.get(urlsplit(inc_res.location).path).get_data(as_text=True)
+        self.assertIn("ГАС + рейтинговая надбавка", inc_html)
+
+        # Other student gets 404 on instant document
+        other = self.app.test_client()
+        self.login(other, 1)
+        self.assertEqual(other.get(doc_path).status_code, 404)
+
+    def test_dormitory_payment_is_idempotent_and_receipt_is_owner_isolated(self):
+        self.login()
+        campus_page = self.browser.get("/campus")
+        self.assertEqual(campus_page.status_code, 200)
+        self.assertIn("ОД-24/412", campus_page.get_data(as_text=True))
+        # Unpaid receipt is 404 before payment
+        self.assertEqual(self.browser.get("/campus/receipt/chg-1-nov").status_code, 404)
+
+        # Other student cannot pay Lera's dorm charge
+        other = self.app.test_client()
+        self.login(other, 1)
+        other_campus = other.get("/campus")
+        self.assertEqual(
+            other.post("/campus/pay/chg-1-nov", data={"_csrf": token(other_campus), "method": "sbp"}).status_code,
+            404,
+        )
+
+        # Lera pays her November dorm charge (idempotent on retry)
+        pay1 = self.browser.post("/campus/pay/chg-1-nov", data={"_csrf": token(campus_page), "method": "sbp"})
+        self.assertEqual(pay1.status_code, 303)
+        pay2 = self.browser.post("/campus/pay/chg-1-nov", data={"_csrf": token(campus_page), "method": "sbp"})
+        self.assertEqual(pay1.location, pay2.location)
+
+        receipt = self.browser.get("/campus/receipt/chg-1-nov")
+        self.assertEqual(receipt.status_code, 200)
+        self.assertIn("Подтверждение платежа", receipt.get_data(as_text=True))
+        self.assertIn("3 400 ₽", receipt.get_data(as_text=True))
+        # Other student cannot read Lera's receipt
+        self.assertEqual(other.get("/campus/receipt/chg-1-nov").status_code, 404)
+
+    def test_guest_pass_and_coworking_booking_enforce_ownership(self):
+        self.login()
+        campus_page = self.browser.get("/campus")
+        csrf_tok = token(campus_page)
+        visit_date = re.search(r'<select id="guest_date" name="visit_date">\s*<option value="([^"]+)"', campus_page.get_data(as_text=True))[1]
+
+        gp = self.browser.post("/campus/guest-pass", data={
+            "_csrf": csrf_tok,
+            "guest_name": "Маяков Илья Сергеевич",
+            "visit_date": visit_date,
+            "location": "Студдом № 2",
+        })
+        self.assertEqual(gp.status_code, 303)
+        updated_html = self.browser.get("/campus").get_data(as_text=True)
+        self.assertIn("Маяков Илья Сергеевич", updated_html)
+        pass_id = re.search(r'/campus/guest-pass/([0-9a-f]+)/revoke', updated_html)[1]
+
+        bk = self.browser.post("/campus/book-room", data={
+            "_csrf": csrf_tok,
+            "space_id": "box-k1",
+            "booking_date": visit_date,
+            "slot_label": "11:35–13:00",
+            "purpose": "Подготовка кейса",
+        })
+        self.assertEqual(bk.status_code, 303)
+        updated_html = self.browser.get("/campus").get_data(as_text=True)
+        self.assertIn("Проектный бокс К–1", updated_html)
+        booking_id = re.search(r'/campus/book-room/([0-9a-f]+)/cancel', updated_html)[1]
+
+        # Other student cannot revoke Lera's guest pass or room booking
+        other = self.app.test_client()
+        self.login(other, 1)
+        other_csrf = token(other.get("/campus"))
+        self.assertEqual(other.post(f"/campus/guest-pass/{pass_id}/revoke", data={"_csrf": other_csrf}).status_code, 404)
+        self.assertEqual(other.post(f"/campus/book-room/{booking_id}/cancel", data={"_csrf": other_csrf}).status_code, 404)
+
+    def test_smart_navigator_personalizes_context_per_student(self):
+        self.login()
+        lera_nav = self.browser.get("/navigator?q=общежитие").get_data(as_text=True)
+        self.assertIn("ОД-24/412", lera_nav)
+        self.assertNotIn("ОД-23/109", lera_nav)
+
+        other = self.app.test_client()
+        self.login(other, 1)
+        misha_nav = other.get("/navigator?q=общежитие").get_data(as_text=True)
+        self.assertIn("ОД-23/109", misha_nav)
+        self.assertNotIn("ОД-24/412", misha_nav)
+
     def test_schedule_and_grades_differ_between_students(self):
         self.login()
         other = self.app.test_client()
@@ -169,80 +275,156 @@ class PortalTest(unittest.TestCase):
         self.assertEqual(result.status_code, 422)
         self.assertNotIn("<script>alert(1)</script>", result.get_data(as_text=True))
 
-    def test_staff_queue_resolution_and_group_announcements_are_role_isolated(self):
-        # Student cannot access /staff
+    def test_staff_queue_return_schedule_override_and_announcements(self):
+        # Student cannot access any /staff route
         self.login()
-        self.assertEqual(self.browser.get("/staff").status_code, 404)
-        appeal_form = self.browser.get("/requests/new/appeal")
-        created = self.browser.post("/requests/new/appeal", data={
-            "_csrf": token(appeal_form),
-            "nonce": token(appeal_form, "nonce"),
-            "comment": "Прошу перенести сдачу зачёта по уважительной причине.",
+        for st_path in ("/staff", "/staff/schedule", "/staff/students", "/staff/notices"):
+            self.assertEqual(self.browser.get(st_path).status_code, 404)
+
+        med_form = self.browser.get("/requests/new/medical")
+        created = self.browser.post("/requests/new/medical", data={
+            "_csrf": token(med_form),
+            "nonce": token(med_form, "nonce"),
+            "subject": "Форма 095/у",
+            "comment": "Болела с 10 по 14 ноября, справка поликлиники № 209.",
         })
         req_path = urlsplit(created.location).path
         req_id = req_path.split("/")[-1]
 
-        # Staff logs in and is redirected to /staff
+        # Staff logs in
         staff = self.app.test_client()
         login_res = self.login(staff, 2)
         self.assertEqual(urlsplit(login_res.location).path, "/staff")
-        self.assertEqual(urlsplit(staff.get("/").location).path, "/staff")
-        staff_page = staff.get("/staff")
-        self.assertEqual(staff_page.status_code, 200)
-        self.assertIn(req_id[:8].upper(), staff_page.get_data(as_text=True))
 
-        # Staff resolves the student's appeal with an official reply
-        resolved = staff.post(f"/staff/requests/{req_id}/resolve", data={
+        # Return petition for revision
+        staff_page = staff.get("/staff")
+        returned = staff.post(f"/staff/requests/{req_id}/resolve", data={
             "_csrf": token(staff_page),
-            "staff_note": "Заявление согласовано, перенос назначен на резервный день.",
+            "decision": "returned",
+            "staff_note": "Приложите номер бланка справки 095/у.",
         })
-        self.assertEqual(resolved.status_code, 303)
-        self.assertIn(
-            "Заявление согласовано, перенос назначен на резервный день.",
-            self.browser.get(req_path).get_data(as_text=True),
-        )
-        self.assertIn(
-            "Ответ деканата по заявлению",
-            self.browser.get("/notifications").get_data(as_text=True),
-        )
+        self.assertEqual(returned.status_code, 303)
+        detail_html = self.browser.get(req_path).get_data(as_text=True)
+        self.assertIn("Возвращено", detail_html)
+        self.assertIn("Приложите номер бланка справки 095/у.", detail_html)
+        self.assertEqual(self.browser.get(req_path + "/document").status_code, 404)
 
-        # Staff publishes an announcement strictly for МП-24-1
-        staff_page = staff.get("/staff")
+        # Staff sets live room override for МП-24-1 Monday 10:00 -> Б–302
+        sched_page = staff.get("/staff/schedule?group=МП-24-1")
+        ov_res = staff.post("/staff/schedule/override", data={
+            "_csrf": token(sched_page),
+            "student_group": "МП-24-1",
+            "weekday": "0",
+            "start_time": "10:00",
+            "new_room": "Б–302",
+            "note": "Замена проектора",
+        })
+        self.assertEqual(ov_res.status_code, 303)
+        self.assertIn("Б–302", self.browser.get("/schedule?view=week").get_data(as_text=True))
+        self.assertIn("Перенос из А–302", self.browser.get("/schedule.ics").get_data(as_text=True))
+
+        # Staff publishes announcement strictly for МП-24-1
+        notices_page = staff.get("/staff/notices")
         announced = staff.post("/staff/announcements", data={
-            "_csrf": token(staff_page),
+            "_csrf": token(notices_page),
             "target_group": "МП-24-1",
-            "kind": "Расписание",
-            "title": "Дополнительная консультация в Б–302",
-            "body": "В четверг в 16:00 пройдёт разбор проектных работ группы МП-24-1.",
+            "kind": "Деканат",
+            "title": "Приём документов на ПГАС до пятницы",
+            "body": "Загрузите перечень публикаций и кейсов до 18:00 пятницы.",
         })
         self.assertEqual(announced.status_code, 303)
-        self.assertIn(
-            "Дополнительная консультация в Б–302",
-            self.browser.get("/notifications").get_data(as_text=True),
-        )
+        self.assertIn("Приём документов на ПГАС до пятницы", self.browser.get("/notifications").get_data(as_text=True))
+
         other_student = self.app.test_client()
         self.login(other_student, 1)
-        self.assertNotIn(
-            "Дополнительная консультация в Б–302",
-            other_student.get("/notifications").get_data(as_text=True),
-        )
+        self.assertNotIn("Приём документов на ПГАС до пятницы", other_student.get("/notifications").get_data(as_text=True))
 
     def test_pages_contain_no_inline_styles_or_scripts_for_strict_csp(self):
         login_html = self.browser.get("/login").get_data(as_text=True)
         self.assertNotRegex(login_html, r"\sstyle=")
         self.assertNotRegex(login_html, r"<script(?![^>]*\bsrc=)")
         self.login()
-        for path in ("/", "/schedule", "/schedule?view=week", "/grades", "/requests",
-                     "/requests/new/study", "/notifications", "/profile"):
+        for path in (
+            "/", "/navigator", "/schedule", "/schedule?view=week", "/grades",
+            "/requests", "/requests/new/study", "/requests/new/medical",
+            "/campus", "/campus/receipt/chg-1-oct", "/notifications", "/profile",
+        ):
             html = self.browser.get(path).get_data(as_text=True)
             self.assertNotRegex(html, r"\sstyle=", msg=path)
             self.assertNotRegex(html, r"<script(?![^>]*\bsrc=)", msg=path)
         staff = self.app.test_client()
         self.login(staff, 2)
-        for path in ("/staff", "/profile"):
+        for path in ("/staff", "/staff/schedule", "/staff/students", "/staff/notices", "/profile"):
             html = staff.get(path).get_data(as_text=True)
             self.assertNotRegex(html, r"\sstyle=", msg=path)
             self.assertNotRegex(html, r"<script(?![^>]*\bsrc=)", msg=path)
+
+    def test_login_rate_limit_blocks_after_five_failures(self):
+        for _ in range(5):
+            res = self.login(password="wrong-password")
+            self.assertEqual(res.status_code, 401)
+        blocked = self.login()  # 6th attempt even with valid password must be 429
+        self.assertEqual(blocked.status_code, 429)
+        self.assertIn("Слишком много неудачных попыток входа", blocked.get_data(as_text=True))
+
+    def test_public_qr_verify_masks_name_and_enforces_revoke_ownership(self):
+        self.login()
+        reqs_page = self.browser.get("/requests")
+        issued = self.browser.post("/requests/instant/military", data={
+            "_csrf": token(reqs_page),
+            "nonce": token(reqs_page, "nonce"),
+        })
+        doc_path = urlsplit(issued.location).path
+        req_id = doc_path.split("/")[-2]
+        doc_html = self.browser.get(doc_path).get_data(as_text=True)
+        self.assertIn("ОБРАЗЕЦ / ДЕМО", doc_html)
+        verify_path = re.search(r'href="(/verify/[A-Za-z0-9_-]+)"', doc_html)[1]
+
+        # Anonymous public verification shows masked name, not full name or email
+        anon = self.app.test_client()
+        pub_res = anon.get(verify_path)
+        self.assertEqual(pub_res.status_code, 200)
+        pub_html = pub_res.get_data(as_text=True)
+        self.assertIn("Подлинность подтверждена", pub_html)
+        self.assertIn("Маякова В. И.", pub_html)
+        self.assertNotIn("Валерия Ильинична Маякова", pub_html)
+        self.assertNotIn("lera@demo.example", pub_html)
+        self.assertNotRegex(pub_html, r"\sstyle=")
+
+        # Other student cannot revoke Lera's certificate (IDOR -> 404)
+        other = self.app.test_client()
+        self.login(other, 1)
+        other_csrf = token(other.get("/requests"))
+        self.assertEqual(other.post(f"/requests/{req_id}/revoke", data={"_csrf": other_csrf}).status_code, 404)
+
+        # Owner revokes certificate -> public page immediately reflects revocation
+        owner_verify = self.browser.get(verify_path)
+        rev = self.browser.post(f"/requests/{req_id}/revoke", data={"_csrf": token(owner_verify)})
+        self.assertEqual(rev.status_code, 303)
+        self.assertIn("Документ отозван", anon.get(verify_path).get_data(as_text=True))
+
+    def test_one_tap_gap_booking_on_home_and_concept_notice_everywhere(self):
+        notice = "Концепт для конкурса MGIMO × AI Challenge. Не официальный сервис вуза. Все данные вымышлены."
+        self.assertIn(notice, self.browser.get("/login").get_data(as_text=True))
+        self.assertIn(notice, self.browser.get("/verify/nonexistenttoken1234", follow_redirects=False).get_data(as_text=True))
+
+        self.login()
+        home_page = self.browser.get("/")
+        home_html = home_page.get_data(as_text=True)
+        self.assertIn(notice, home_html)
+        b_date = re.search(r'name="booking_date" value="([^"]+)"', home_html)[1]
+        b_slot = re.search(r'name="slot_label" value="([^"]+)"', home_html)[1]
+        gap_res = self.browser.post("/campus/book-gap", data={
+            "_csrf": token(home_page),
+            "booking_date": b_date,
+            "slot_label": b_slot,
+        })
+        self.assertEqual(gap_res.status_code, 303)
+        self.assertIn("Проектный бокс К–1", self.browser.get("/").get_data(as_text=True))
+
+        staff = self.app.test_client()
+        self.login(staff, 2)
+        self.assertIn(notice, staff.get("/staff").get_data(as_text=True))
 
 
 if __name__ == "__main__":
