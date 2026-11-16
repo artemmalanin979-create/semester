@@ -732,6 +732,14 @@ body.signed-in {
   border-top: 1px solid var(--line-soft);
 }
 
+.sidebar-concept {
+  margin-top: 8px;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--dim);
+}
+
 .account-dock {
   display: flex;
   align-items: center;
@@ -3471,6 +3479,11 @@ a.box-row:hover .wallet-flap {
 .staff-main-grid > section,
 .staff-main-grid > .staff-side-stack {
   min-width: 0;
+}
+
+.staff-main-grid .seg-item {
+  padding: 6px 10px;
+  font-size: 12.5px;
 }
 
 .sim-banner {

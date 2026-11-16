@@ -9,8 +9,8 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Семестр{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='7') }}">
-  <script defer src="{{ url_for('static', filename='portal.js', v='7') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='8') }}">
+  <script defer src="{{ url_for('static', filename='portal.js', v='8') }}"></script>
 </head>
 <body class="{{ 'signed-in' if g.student else 'signed-out' }}">
   <a class="skip-link" href="#content">К содержимому</a>
@@ -47,6 +47,7 @@
           <small class="num">{{ 'Учебный офис · ' ~ g.student.student_group if is_staff else g.student.student_group ~ ' · ' ~ g.student.course ~ ' курс' }}</small>
         </span>
       </a>
+      <p class="sidebar-concept">Конкурсный прототип · не официальный сервис вуза</p>
     </div>
   </aside>
 
