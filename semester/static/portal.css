@@ -2711,17 +2711,374 @@ body.signed-in {
   fill: oklch(.17 0 0);
 }
 
+/* ── Хореография кадров и внутренних объектов ───────────────
+   Движение повторяет смысл элемента и сидит на одной кривой --ease:
+   вход страницы собирает блоки один раз и замирает; детали внутри карточек
+   откликаются только на :hover / действие пользователя. */
+@keyframes frame-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bar-draw {
+  from {
+    transform: scaleX(.32);
+    opacity: .45;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes photo-settle {
+  from {
+    transform: scale(1.032);
+    opacity: .88;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(.982);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes row-reveal {
+  from {
+    opacity: .38;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bell-swing {
+  0%   { transform: rotate(0deg); }
+  25%  { transform: rotate(-9deg); }
+  55%  { transform: rotate(6.5deg); }
+  80%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes target-flash {
+  0%   { background: color-mix(in oklch, var(--ok) 11%, var(--card)); }
+  100% { background: transparent; }
+}
+
+@keyframes field-pulse {
+  0%   { border-color: var(--text); }
+  100% { border-color: var(--line); }
+}
+
+/* Однократная сборка полосок марки */
+.brand-mark i {
+  transform-origin: left center;
+  transition: transform .32s var(--ease), opacity .25s var(--ease);
+  animation: bar-draw .48s var(--ease) both;
+}
+.brand-mark i:nth-child(2) { animation-delay: .05s; }
+.brand-mark i:nth-child(3) { animation-delay: .10s; }
+
+.brand:hover .brand-mark i:nth-child(1) { transform: scaleX(.86); }
+.brand:hover .brand-mark i:nth-child(2) { transform: scaleX(1.18); }
+.brand:hover .brand-mark i:nth-child(3) { transform: scaleX(.94); }
+
+/* Каскадный вход кадров страницы */
+.page-heading,
+.focus-card,
+.metrics-bar,
+.schedule-controls,
+.week-matrix-wrap,
+.dashboard-grid > *,
+.content-stack > *,
+.catalog-grid > *,
+.profile-grid > *,
+.staff-grid > *,
+.form-split > *,
+.document-sheet,
+.notices-list,
+.login-form-wrap {
+  animation: frame-in .38s var(--ease) both;
+}
+
+.focus-card,
+.metrics-bar,
+.schedule-controls,
+.catalog-grid > :nth-child(1),
+.profile-grid > :nth-child(1),
+.staff-grid > :nth-child(1),
+.form-split > :nth-child(1) {
+  animation-delay: .035s;
+}
+
+.dashboard-grid > :nth-child(1),
+.week-matrix-wrap,
+.content-stack > :nth-child(1),
+.catalog-grid > :nth-child(2),
+.profile-grid > :nth-child(2),
+.staff-grid > :nth-child(2),
+.form-split > :nth-child(2),
+.notices-list {
+  animation-delay: .07s;
+}
+
+.dashboard-grid > :nth-child(2),
+.content-stack > :nth-child(2),
+.catalog-grid > :nth-child(3) {
+  animation-delay: .105s;
+}
+
+/* Внутренние узлы главных карточек */
+.focus-body > * {
+  animation: frame-in .42s var(--ease) both;
+}
+.focus-body > :nth-child(1) { animation-delay: .06s; }
+.focus-body > :nth-child(2) { animation-delay: .095s; }
+.focus-body > :nth-child(3) { animation-delay: .13s; }
+
+.metrics-bar .metric-cell {
+  animation: frame-in .38s var(--ease) both;
+}
+.metrics-bar .metric-cell:nth-child(1) { animation-delay: .04s; }
+.metrics-bar .metric-cell:nth-child(2) { animation-delay: .075s; }
+.metrics-bar .metric-cell:nth-child(3) { animation-delay: .11s; }
+.metrics-bar .metric-cell:nth-child(4) { animation-delay: .145s; }
+
+.timeline li {
+  animation: frame-in .36s var(--ease) both;
+}
+.timeline li:nth-child(1) { animation-delay: .05s; }
+.timeline li:nth-child(2) { animation-delay: .10s; }
+.timeline li:nth-child(3) { animation-delay: .15s; }
+
+.demo-cards .demo-account-btn {
+  animation: frame-in .36s var(--ease) both;
+}
+.demo-cards .demo-account-btn:nth-child(1) { animation-delay: .06s; }
+.demo-cards .demo-account-btn:nth-child(2) { animation-delay: .10s; }
+.demo-cards .demo-account-btn:nth-child(3) { animation-delay: .14s; }
+
+.login-photo-frame img {
+  animation: photo-settle .88s var(--ease) both;
+  transition: transform .65s var(--ease), filter .3s var(--ease);
+}
+
+.login-photo-frame:hover img {
+  transform: scale(1.014);
+}
+
+/* Тактильный отклик карточек, ячеек и внутренних элементов */
+.catalog-card,
+.matrix-card {
+  transition: border-color .18s var(--ease), background .18s var(--ease), transform .22s var(--ease), box-shadow .22s var(--ease);
+}
+
+.catalog-card:hover,
+.matrix-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow);
+}
+
+.catalog-card:active,
+.matrix-card:active {
+  transform: translateY(0) scale(.992);
+}
+
+.day-cell {
+  transition: border-color .15s var(--ease), background .15s var(--ease), color .15s var(--ease), transform .18s var(--ease);
+}
+
+.day-cell:hover:not(.selected) {
+  transform: translateY(-1px);
+}
+
+.day-cell:active {
+  transform: scale(.97);
+}
+
+.demo-code {
+  transition: border-color .18s var(--ease), color .18s var(--ease), transform .18s var(--ease);
+}
+
+.demo-account-btn:hover .demo-code {
+  border-color: var(--dim);
+  color: var(--text);
+  transform: translateX(1.5px);
+}
+
+.pass-card-qr .qr-svg {
+  transition: transform .28s var(--ease), border-color .22s var(--ease);
+}
+
+.pass-card:hover .pass-card-qr .qr-svg {
+  transform: scale(1.03);
+  border-color: var(--dim);
+}
+
+.lesson {
+  transition: background .18s var(--ease);
+}
+
+.lesson:hover {
+  background: color-mix(in oklch, var(--bg-soft) 65%, var(--card));
+}
+
+.lesson:target {
+  animation: target-flash 1.6s var(--ease) 1;
+}
+
+.row-reveal {
+  animation: row-reveal .22s var(--ease) both;
+}
+
+input.field-filled {
+  animation: field-pulse .55s var(--ease) 1;
+}
+
+.modal-dialog[open] {
+  animation: dialog-in .2s var(--ease) both;
+}
+
+/* Внутренние детали векторных иконок (семантическое движение на :hover) */
+.ic-part {
+  transform-box: view-box;
+  transition: transform .36s var(--ease), opacity .25s var(--ease);
+}
+
+.ic-clock .clock-hand,
+.ic-refresh .spin-vec,
+.ic-plus .plus-vec {
+  transform-origin: 12px 12px;
+}
+
+.ic-bell .bell-dome,
+.ic-bell .bell-clapper {
+  transform-origin: 12px 4px;
+}
+
+.btn:hover .arrow-vec,
+.text-link:hover .arrow-vec,
+.catalog-card:hover .arrow-vec {
+  transform: translateX(2.5px);
+}
+
+.btn:hover .left-vec,
+.text-link:hover .left-vec,
+.icon-btn:hover .left-vec {
+  transform: translateX(-2.5px);
+}
+
+.icon-btn:hover .diag-vec {
+  transform: translate(2px, -2px);
+}
+
+.btn:hover .plus-vec {
+  transform: rotate(90deg);
+}
+
+.btn:hover .dl-vec,
+.icon-btn:hover .dl-vec {
+  transform: translateY(2px);
+}
+
+.btn:hover .spin-vec {
+  transform: rotate(180deg);
+}
+
+.btn:hover .out-vec {
+  transform: translateX(2.5px);
+}
+
+.icon-btn:hover .copy-front {
+  transform: translate(1.2px, -1.2px);
+}
+
+.bell-btn:hover .bell-dome,
+.nav-link:hover .bell-dome {
+  animation: bell-swing .55s var(--ease) 1;
+}
+
+.bell-btn:hover .bell-clapper,
+.nav-link:hover .bell-clapper {
+  transform: translateX(1.2px);
+}
+
+a.box-row:hover .swap-top,
+.transfer-strip:hover .swap-top {
+  transform: translateX(-2.5px);
+}
+
+a.box-row:hover .swap-bot,
+.transfer-strip:hover .swap-bot {
+  transform: translateX(2.5px);
+}
+
+a.box-row:hover .layer-top,
+.catalog-card:hover .layer-top,
+.btn:hover .layer-top {
+  transform: translateY(-2px);
+}
+
+a.box-row:hover .layer-bot,
+.catalog-card:hover .layer-bot,
+.btn:hover .layer-bot {
+  transform: translateY(1.8px);
+}
+
+a.box-row:hover .ic-file .line-a,
+.catalog-card:hover .ic-file .line-a {
+  transform: translateX(1.5px);
+}
+
+a.box-row:hover .ic-file .line-b,
+.catalog-card:hover .ic-file .line-b {
+  transform: translateX(1.5px);
+  transition-delay: .04s;
+}
+
+a.box-row:hover .msg-box,
+.catalog-card:hover .msg-box {
+  transform: translateY(-1.5px);
+}
+
+a.box-row:hover .clock-hand,
+.detail-panel:hover .clock-hand {
+  transform: rotate(180deg);
+  transition-duration: .62s;
+}
+
+.nav-link:hover .chart-line {
+  transform: translateY(-1.2px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  .seg-thumb,
-  .rays,
-  .icon-btn,
-  .seg-item,
-  .btn,
-  .row-arrow {
-    transition: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .001ms !important;
   }
 }
 

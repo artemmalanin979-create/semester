@@ -125,6 +125,11 @@
       if (!emailInput || !passInput) return;
       emailInput.value = btn.getAttribute("data-demo-email") || "";
       passInput.value = btn.getAttribute("data-demo-password") || "";
+      [emailInput, passInput].forEach((el) => {
+        el.classList.remove("field-filled");
+        void el.offsetWidth;
+        el.classList.add("field-filled");
+      });
       const submitBtn = document.querySelector("#login-form button[type='submit']");
       if (submitBtn) submitBtn.focus();
     });
@@ -139,6 +144,16 @@
     });
   }
 
+  function revealVisibleRows(rows) {
+    rows.forEach((row) => {
+      row.classList.remove("row-reveal");
+      if (!row.hidden) {
+        void row.offsetWidth;
+        row.classList.add("row-reveal");
+      }
+    });
+  }
+
   // Grades filter
   const gradeSeg = document.querySelector("[data-grade-filters]");
   if (gradeSeg) {
@@ -147,9 +162,11 @@
       btn.addEventListener("click", () => {
         activateSegButton(gradeSeg, btn);
         const mode = btn.getAttribute("data-grade-filter");
-        document.querySelectorAll("[data-grade-state]").forEach((row) => {
+        const rows = document.querySelectorAll("[data-grade-state]");
+        rows.forEach((row) => {
           row.hidden = mode !== "all" && row.getAttribute("data-grade-state") !== mode;
         });
+        revealVisibleRows(rows);
       });
     });
   }
@@ -162,7 +179,8 @@
       btn.addEventListener("click", () => {
         activateSegButton(noticeSeg, btn);
         const mode = btn.getAttribute("data-notice-filter");
-        document.querySelectorAll("[data-notice-kind]").forEach((row) => {
+        const rows = document.querySelectorAll("[data-notice-kind]");
+        rows.forEach((row) => {
           if (mode === "all") {
             row.hidden = false;
           } else if (mode === "unread") {
@@ -171,6 +189,7 @@
             row.hidden = row.getAttribute("data-notice-kind") !== mode;
           }
         });
+        revealVisibleRows(rows);
       });
     });
   }
@@ -183,9 +202,11 @@
       btn.addEventListener("click", () => {
         activateSegButton(staffSeg, btn);
         const mode = btn.getAttribute("data-staff-filter");
-        document.querySelectorAll("[data-staff-state]").forEach((row) => {
+        const rows = document.querySelectorAll("[data-staff-state]");
+        rows.forEach((row) => {
           row.hidden = mode !== "all" && row.getAttribute("data-staff-state") !== mode;
         });
+        revealVisibleRows(rows);
       });
     });
   }
