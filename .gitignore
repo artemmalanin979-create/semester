@@ -8,4 +8,5 @@ backups/
 .env
 .env.*
 !.env.example
+*.bak-*
 .venv/

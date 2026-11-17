@@ -14,6 +14,7 @@ rsync -az --delete \
   --exclude '.git' \
   --exclude '.env' \
   --exclude '.env.*' \
+  --exclude '*.bak-*' \
   --exclude 'instance' \
   --exclude '.venv' \
   --exclude '__pycache__' \

@@ -2,7 +2,7 @@
 
 Концепт для конкурса **MGIMO × AI Challenge** («Цифровой деканат будущего»). Не официальный сервис вуза. Все профили, учебные данные, договоры и документы вымышлены и созданы исключительно для демонстрации.
 
-- **Публичный стенд (РФ, без VPN, HTTPS):** `https://semestr.136-234-232-127.sslip.io`
+- **Публичный стенд (РФ, без VPN, HTTPS):** [https://semestr.iamcp.ru](https://semestr.iamcp.ru)
 
 ## Локальный запуск
 
@@ -42,7 +42,7 @@ flask --app semester run --port 8765
 
 Стенд развёрнут в российском облаке (Новосибирск, Ubuntu 24.04 LTS) за reverse-proxy **Caddy 2** с автоматическим сертификатом Let's Encrypt, `HSTS`, `restart: unless-stopped`, постоянным Docker-томом SQLite (режим `WAL`), ежедневным онлайн-бэкапом (`deploy/backup-sqlite.sh`) и проверкой `/healthz` каждые 5 минут (`deploy/uptime-check.sh`).
 
-- **Первичная настройка нового сервера:** `sudo SEMESTER_DOMAIN=semestr.<IP>.sslip.io bash deploy/bootstrap.sh` (подробно — в `deploy/README.md`).
+- **Первичная настройка нового сервера:** `sudo SEMESTER_DOMAIN=semestr.iamcp.ru bash deploy/bootstrap.sh` (подробно — в `deploy/README.md`).
 - **Повторный деплой одной командой после изменений:**
   ```bash
   ./deploy.sh deploy@136.234.232.127

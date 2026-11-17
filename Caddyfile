@@ -1,4 +1,4 @@
-{$SEMESTER_DOMAIN} {
+{$SEMESTER_DOMAIN}, semestr.136-234-232-127.sslip.io {
 	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
