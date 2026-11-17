@@ -538,6 +538,46 @@ class PortalTest(unittest.TestCase):
             "password": "Custom-Lera-99",
         }).status_code, 303)
 
+    def test_favicon_manifest_brand_mark_and_password_toggle(self):
+        # Anonymous public access to favicons, apple-touch-icon and webmanifest
+        ico = self.browser.get("/favicon.ico")
+        self.assertEqual(ico.status_code, 200)
+        self.assertEqual(ico.data[:6], b"\x00\x00\x01\x00\x03\x00")  # ICO header with 3 sizes (16/32/48)
+        ico.close()
+
+        svg = self.browser.get("/static/favicon.svg")
+        self.assertEqual(svg.status_code, 200)
+        svg_text = svg.get_data(as_text=True)
+        self.assertIn('viewBox="0 0 32 32"', svg_text)
+        self.assertNotIn("<style", svg_text)
+        svg.close()
+
+        apple = self.browser.get("/apple-touch-icon.png")
+        self.assertEqual(apple.status_code, 200)
+        self.assertEqual(apple.data[:8], b"\x89PNG\r\n\x1a\n")
+        apple.close()
+
+        manifest = self.browser.get("/manifest.webmanifest")
+        self.assertEqual(manifest.status_code, 200)
+        m_text = manifest.get_data(as_text=True)
+        self.assertIn("192x192", m_text)
+        self.assertIn("512x512", m_text)
+        manifest.close()
+
+        for png_name in ("icon-192.png", "icon-512.png"):
+            png_resp = self.browser.get(f"/static/{png_name}")
+            self.assertEqual(png_resp.status_code, 200)
+            png_resp.close()
+
+        login_html = self.browser.get("/login").get_data(as_text=True)
+        self.assertIn("brand-mark-svg", login_html)
+        self.assertIn('rel="manifest"', login_html)
+        self.assertIn('rel="apple-touch-icon"', login_html)
+        self.assertIn('class="password-toggle"', login_html)
+        self.assertNotIn('icon-btn password-toggle', login_html)
+        self.assertIn('aria-label="Показать пароль"', login_html)
+        self.assertIn('data-tip="Показать пароль"', login_html)
+
 
 if __name__ == "__main__":
     unittest.main()

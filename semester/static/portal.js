@@ -113,7 +113,7 @@
       if (closedIcon) closedIcon.hidden = !show;
       const text = show ? "Скрыть пароль" : "Показать пароль";
       btn.setAttribute("aria-label", text);
-      btn.setAttribute("title", text);
+      btn.setAttribute("data-tip", text);
     });
   });
 

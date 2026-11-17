@@ -52,7 +52,11 @@
 
 {% macro mark() -%}
 <span class="brand-mark" aria-hidden="true">
-  <i></i><i></i><i></i>
+  <svg class="brand-mark-svg" width="28" height="28" viewBox="0 0 32 32" fill="none">
+    <rect class="brand-mark-tile" width="32" height="32" rx="8"/>
+    <path class="brand-mark-ribbon" d="M19.8 0H23.6V7.8L21.7 6.35L19.8 7.8V0Z"/>
+    <path class="brand-mark-glyph" d="M19.2 11.5A6.0 6.0 0 1 0 19.2 20.3" stroke-width="3.2" stroke-linecap="round"/>
+  </svg>
 </span>
 {%- endmacro %}
 

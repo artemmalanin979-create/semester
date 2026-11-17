@@ -4,13 +4,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#F4F6F5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17382B" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#101010" media="(prefers-color-scheme: dark)">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Семестр{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('favicon_ico') }}" sizes="48x48">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='10') }}">
-  <script defer src="{{ url_for('static', filename='portal.js', v='10') }}"></script>
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='11') }}">
+  <script defer src="{{ url_for('static', filename='portal.js', v='11') }}"></script>
 </head>
 <body class="{{ 'signed-in' if g.student else 'signed-out' }}">
   <a class="skip-link" href="#content">К содержимому</a>

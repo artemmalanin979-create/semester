@@ -195,29 +195,57 @@ img, svg {
 }
 
 .brand-mark {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 7px;
-  background: var(--accent);
-  color: var(--on-accent);
   display: inline-flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 2.5px;
-  padding: 6px;
   flex: none;
 }
 
-.brand-mark i {
+.brand-mark-svg {
+  width: 28px;
+  height: 28px;
   display: block;
-  height: 2px;
-  border-radius: 1px;
-  background: currentColor;
 }
 
-.brand-mark i:nth-child(1) { width: 100%; }
-.brand-mark i:nth-child(2) { width: 72%; }
-.brand-mark i:nth-child(3) { width: 88%; opacity: .65; }
+.brand-mark-tile {
+  fill: #17382B;
+  transition: fill .18s var(--ease);
+}
+
+.brand-mark-ribbon {
+  fill: #7AD3A6;
+  transition: transform .24s var(--ease), fill .18s var(--ease);
+}
+
+.brand-mark-glyph {
+  stroke: #F5F8F6;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme=dark] .brand-mark-tile,
+  :root:not([data-theme=light]) .brand-mark-tile {
+    fill: #1F4A39;
+  }
+  [data-theme=dark] .brand-mark,
+  :root:not([data-theme=light]) .brand-mark {
+    box-shadow: 0 0 0 1px oklch(1 0 0 / .12);
+  }
+}
+
+[data-theme=dark] .brand-mark-tile {
+  fill: #1F4A39;
+}
+
+[data-theme=dark] .brand-mark {
+  box-shadow: 0 0 0 1px oklch(1 0 0 / .12);
+}
+
+.brand:hover .brand-mark-ribbon {
+  transform: translateY(1px);
+}
 
 /* ── Кнопки и иконки ──────────────────────────────────────── */
 .btn {
@@ -1001,13 +1029,80 @@ body.signed-in {
 }
 
 .password-input input {
-  padding-right: 44px;
+  padding-right: 48px;
+}
+
+.password-input input::-ms-reveal,
+.password-input input::-ms-clear {
+  display: none;
 }
 
 .password-toggle {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color .15s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.password-toggle:hover,
+.password-toggle:active {
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.password-toggle:focus {
+  outline: none;
+}
+
+.password-toggle:focus-visible {
+  outline: 1.5px solid var(--dim);
+  outline-offset: 2px;
+}
+
+.password-toggle[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity .14s var(--ease), transform .14s var(--ease);
+  z-index: 20;
+}
+
+.password-toggle[data-tip]:hover::after,
+.password-toggle[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .demo-switcher {
@@ -2827,19 +2922,6 @@ body.signed-in {
   0%   { border-color: var(--text); }
   100% { border-color: var(--line); }
 }
-
-/* Однократная сборка полосок марки */
-.brand-mark i {
-  transform-origin: left center;
-  transition: transform .32s var(--ease), opacity .25s var(--ease);
-  animation: bar-draw .48s var(--ease) both;
-}
-.brand-mark i:nth-child(2) { animation-delay: .05s; }
-.brand-mark i:nth-child(3) { animation-delay: .10s; }
-
-.brand:hover .brand-mark i:nth-child(1) { transform: scaleX(.86); }
-.brand:hover .brand-mark i:nth-child(2) { transform: scaleX(1.18); }
-.brand:hover .brand-mark i:nth-child(3) { transform: scaleX(.94); }
 
 /* Каскадный вход кадров страницы */
 .page-heading,

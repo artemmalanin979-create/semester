@@ -1,0 +1,30 @@
+{
+  "name": "Семестр — Цифровой деканат",
+  "short_name": "Семестр",
+  "description": "Расписание, успеваемость, электронные справки, кампус и справочный ИИ-контур деканата.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F6F5",
+  "theme_color": "#17382B",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

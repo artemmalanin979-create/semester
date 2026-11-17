@@ -11,7 +11,7 @@ from pathlib import Path
 
 import click
 from click import ClickException
-from flask import Flask, Response, abort, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, Response, abort, flash, g, redirect, render_template, request, send_from_directory, session, url_for
 from markupsafe import Markup, escape
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -270,6 +270,9 @@ def create_app(config=None):
         public_endpoints = {
             "login",
             "health",
+            "favicon_ico",
+            "apple_touch_icon",
+            "web_manifest",
             "verify_document",
             "verify_pass",
             "verify_guest",
@@ -605,6 +608,18 @@ def create_app(config=None):
     def health():
         get_db().execute("SELECT 1")
         return {"status": "ok"}
+
+    @app.get("/favicon.ico")
+    def favicon_ico():
+        return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/vnd.microsoft.icon")
+
+    @app.get("/apple-touch-icon.png")
+    def apple_touch_icon():
+        return send_from_directory(app.static_folder, "apple-touch-icon.png", mimetype="image/png")
+
+    @app.get("/manifest.webmanifest")
+    def web_manifest():
+        return send_from_directory(app.static_folder, "manifest.webmanifest", mimetype="application/manifest+json")
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
