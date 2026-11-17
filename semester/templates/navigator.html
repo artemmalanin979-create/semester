@@ -25,7 +25,7 @@
 
 <div class="navigator-list mt-24">
   {% for sit in situations %}
-  <article class="surface detail-panel playbook-card" data-nav-card data-nav-keywords="{{ (sit.question ~ ' ' ~ sit.keywords ~ ' ' ~ sit.summary)|lower }}">
+  <article class="surface detail-panel playbook-card" data-nav-card data-nav-triggers="{{ sit.triggers|join('|') }}">
     <div class="detail-head">
       <div>
         <h2>{{ sit.question }}</h2>
@@ -70,5 +70,23 @@
     </div>
   </article>
   {% endfor %}
+
+  <section class="surface detail-panel navigator-empty-card" data-nav-empty{% if situations %} hidden{% endif %}>
+    <div class="detail-head">
+      <div>
+        <h2>Не нашёл готового сценария</h2>
+        <p class="playbook-summary">В быстрых карточках собраны только типовые операции в 1 клик. Спросите ИИ-ассистента по регламентам «Семестра» со ссылками на пункты положений или отправьте вопрос методисту.</p>
+      </div>
+      {{ state_badge('Нет шаблона', 'warn') }}
+    </div>
+    <div class="detail-actions">
+      <a class="btn btn-primary" data-nav-ask-btn href="/assistant{% if query %}?q={{ query|urlencode }}{% endif %}">
+        {{ icon('message', 16) }}<span>Спросить ассистента</span>
+      </a>
+      <a class="btn btn-ghost" data-nav-office-btn href="{{ url_for('request_new', kind='appeal', q=query) if query else url_for('request_new', kind='appeal') }}">
+        <span>Написать в учебный офис</span>{{ icon('arrow', 16) }}
+      </a>
+    </div>
+  </section>
 </div>
 {% endblock %}

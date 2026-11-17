@@ -1,17 +1,20 @@
+import hmac
 import os
 import re
 import secrets
 import sqlite3
 import time
 from datetime import date, timedelta
+from hashlib import sha256
 from pathlib import Path
 
+import click
 from click import ClickException
 from flask import Flask, Response, abort, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .db import close_db, get_db, initialize, session_hash
+from .db import close_db, get_db, initialize, reset_demo_data, session_hash
 from .demo import (
     BOOKING_SLOTS,
     DORM_INFO,
@@ -188,6 +191,26 @@ def create_app(config=None):
             )
             db.execute("DELETE FROM login_sessions")
 
+    @app.cli.command("reset-demo")
+    def reset_demo():
+        """Reset mutable demo data to clean seeded state while keeping password hashes."""
+        reset_demo_data(get_db())
+        click.echo("Demo data reset complete (password hashes preserved).")
+
+    def public_url(endpoint, **values):
+        domain = os.environ.get("SEMESTER_DOMAIN", "").strip()
+        if domain and not app.config.get("TESTING"):
+            return f"https://{domain}{url_for(endpoint, **values)}"
+        return url_for(endpoint, _external=True, **values)
+
+    def pass_token_for(student_id):
+        sig = hmac.new(
+            app.config["SECRET_KEY"].encode("utf-8"),
+            f"pass:{student_id}".encode("ascii"),
+            sha256,
+        ).hexdigest()[:24]
+        return f"p{student_id}-{sig}"
+
     dummy_hash = generate_password_hash(secrets.token_urlsafe(24))
 
     def csrf():
@@ -229,7 +252,15 @@ def create_app(config=None):
             expected = session.get("_csrf")
             if not expected or not secrets.compare_digest(expected.encode(), supplied.encode()):
                 abort(400)
-        if request.endpoint and request.endpoint not in {"login", "health", "verify_document"} and not g.student:
+        public_endpoints = {
+            "login",
+            "health",
+            "verify_document",
+            "verify_pass",
+            "verify_guest",
+            "verify_receipt",
+        }
+        if request.endpoint and request.endpoint not in public_endpoints and not g.student:
             return redirect(url_for("login"), code=303)
         return None
 
@@ -515,8 +546,8 @@ def create_app(config=None):
             ).fetchone()["c"]
         student_meta = STUDENT_PROFILES[g.student["id"]] if signed else None
         pass_qr = (
-            qr_svg_path(f"SEMESTR-PASS:{g.student['id']}:{student_meta['card_number']}")
-            if signed else ""
+            qr_svg_path(public_url("verify_pass", pass_token=pass_token_for(g.student["id"])))
+            if signed else None
         )
         cookie_theme = request.cookies.get("semester_theme", "")
         theme_pref = cookie_theme if cookie_theme in {"light", "dark"} else ""
@@ -904,6 +935,10 @@ def create_app(config=None):
         if request.method != "POST":
             prefill_key = request.args.get("prefill", "")
             prefill_subj, prefill_body = PREFILL_TEMPLATES.get(prefill_key, ("", ""))
+            custom_q = request.args.get("q", "").strip()[:400]
+            if custom_q and not prefill_body:
+                prefill_subj = prefill_subj or "Индивидуальный вопрос по обучению"
+                prefill_body = f"Вопрос в учебный офис: {custom_q}"
             return render_template(
                 "request_new.html",
                 active="requests_list",
@@ -992,7 +1027,7 @@ def create_app(config=None):
         records = academic_results(sid, g.stamp.date()) if item["kind"] == "grades" else []
         scholar = SCHOLARSHIPS[sid] if item["kind"] == "income" else None
         dorm = DORM_INFO[sid] if item["kind"] == "dorm_cert" else None
-        verify_url = url_for("verify_document", token=item["verify_token"], _external=True)
+        verify_url = public_url("verify_document", token=item["verify_token"])
         doc_qr = qr_svg_path(verify_url)
         verify_code = f"SM-{item['id'][:4].upper()}-{item['id'][4:8].upper()}"
         valid_days = 30 if item["kind"] == "military" else 90
@@ -1062,6 +1097,93 @@ def create_app(config=None):
             flash("Электронная справка отозвана, статус в публичном реестре обновлён.")
         return redirect(url_for("verify_document", token=row["verify_token"]), code=303)
 
+    @app.get("/verify/pass/<pass_token>")
+    def verify_pass(pass_token):
+        m = re.fullmatch(r"p([1-3])-([0-9a-f]{24})", pass_token)
+        if not m:
+            abort(404)
+        sid = int(m.group(1))
+        if not secrets.compare_digest(pass_token, pass_token_for(sid)):
+            abort(404)
+        row = get_db().execute("SELECT * FROM students WHERE id = ?", (sid,)).fetchone()
+        if not row:
+            abort(404)
+        meta = STUDENT_PROFILES[sid]
+        return render_template(
+            "verify.html",
+            active="profile",
+            doc_id="",
+            doc_title="Электронный кампусный пропуск «Семестр ID»",
+            masked_name=mask_full_name(row["full_name"]),
+            faculty=row["faculty"],
+            program=f"{meta['degree']} · зоны: {meta['pass_zone']}",
+            course=row["course"] or 1,
+            issued_at="Осенний семестр 2026",
+            valid_until=meta["pass_valid"],
+            verify_code=meta["card_number"],
+            is_revoked=False,
+            revoked_at="",
+            can_revoke=False,
+        )
+
+    @app.get("/verify/guest/<pass_id>")
+    def verify_guest(pass_id):
+        if not re.fullmatch(r"[0-9a-f]{16,32}", pass_id):
+            abort(404)
+        row = get_db().execute(
+            """SELECT guest_passes.*, students.faculty, students.course
+               FROM guest_passes JOIN students ON students.id = guest_passes.student_id
+               WHERE guest_passes.id = ?""",
+            (pass_id,),
+        ).fetchone()
+        if not row:
+            abort(404)
+        return render_template(
+            "verify.html",
+            active="campus",
+            doc_id="",
+            doc_title="Разовый гостевой пропуск в кампус",
+            masked_name=mask_full_name(row["guest_name"]),
+            faculty=row["location"],
+            program="Вход с 09:00 до 22:00 по документу, удостоверяющему личность",
+            course=row["course"],
+            issued_at=fmt_dt(row["created_at"]),
+            valid_until=row["visit_date"],
+            verify_code=f"GP-{row['id'][:6].upper()}",
+            is_revoked=False,
+            revoked_at="",
+            can_revoke=False,
+        )
+
+    @app.get("/verify/receipt/<receipt_code>")
+    def verify_receipt(receipt_code):
+        if not re.fullmatch(r"RCP-[A-Z0-9]{4}-[0-9]{4}", receipt_code):
+            abort(404)
+        row = get_db().execute(
+            """SELECT charges.*, students.full_name, students.faculty, students.course
+               FROM charges JOIN students ON students.id = charges.student_id
+               WHERE charges.receipt_code = ? AND charges.status = 'paid'""",
+            (receipt_code,),
+        ).fetchone()
+        if not row:
+            abort(404)
+        return render_template(
+            "verify.html",
+            active="campus",
+            doc_id="",
+            doc_title=f"Электронная квитанция ({row['category']})",
+            masked_name=mask_full_name(row["full_name"]),
+            faculty=row["faculty"],
+            program=f"Договор {row['contract_no']} · {row['period_label']}",
+            course=row["course"],
+            issued_at=fmt_dt(row["paid_at"]),
+            valid_until="Бессрочно",
+            verify_code=row["receipt_code"],
+            is_revoked=False,
+            revoked_at="",
+            can_revoke=False,
+        )
+
     @app.get("/campus")
     def campus():
         guard = require_student()
@@ -1079,7 +1201,7 @@ def create_app(config=None):
             (sid,),
         ).fetchall():
             entry = dict(row)
-            entry["qr"] = qr_svg_path(f"GUEST:{row['id']}:{sid}:{row['visit_date']}")
+            entry["qr"] = qr_svg_path(public_url("verify_guest", pass_id=row["id"]))
             entry["code"] = f"GP-{row['id'][:6].upper()}"
             passes.append(entry)
         my_bookings = db.execute(
@@ -1155,7 +1277,7 @@ def create_app(config=None):
         if not row or row["status"] != "paid":
             abort(404)
         charge = dict(row)
-        receipt_qr = qr_svg_path(f"SEMESTR-PAY:{charge['id']}:{charge['receipt_code']}:{g.student['id']}")
+        receipt_qr = qr_svg_path(public_url("verify_receipt", receipt_code=charge["receipt_code"]))
         return render_template(
             "receipt.html",
             active="campus",

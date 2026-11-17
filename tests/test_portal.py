@@ -21,6 +21,27 @@ def token(response, name="_csrf"):
     return re.search(fr'name="{name}" value="([^"]+)"', response.get_data(as_text=True))[1]
 
 
+def decode_rendered_qr(html, index=0):
+    """Rasterize the <svg class="qr-svg"> emitted in HTML and decode with OpenCV QRCodeDetector."""
+    matches = list(re.finditer(
+        r'<svg class="qr-svg"[^>]*viewBox="0 0 (\d+) \1"[^>]*>.*?<path d="([^"]+)"',
+        html,
+        re.DOTALL,
+    ))
+    assert matches, "No .qr-svg found in HTML"
+    dim_str, path_d = matches[index].groups()
+    dim = int(dim_str)
+    scale = 10
+    import cv2
+    import numpy as np
+    canvas = np.full((dim * scale, dim * scale, 3), 255, dtype=np.uint8)
+    for x_s, y_s, w_s in re.findall(r"M(\d+) (\d+)h(\d+)v1h-\d+z", path_d):
+        x, y, w = int(x_s), int(y_s), int(w_s)
+        canvas[y * scale:(y + 1) * scale, x * scale:(x + w) * scale] = 0
+    decoded, _, _ = cv2.QRCodeDetector().detectAndDecode(canvas)
+    return decoded
+
+
 class PortalTest(unittest.TestCase):
     def setUp(self):
         self.sandbox = tempfile.TemporaryDirectory()
@@ -425,6 +446,97 @@ class PortalTest(unittest.TestCase):
         staff = self.app.test_client()
         self.login(staff, 2)
         self.assertIn(notice, staff.get("/staff").get_data(as_text=True))
+
+    def test_qr_codes_decode_to_real_scannable_urls(self):
+        self.login()
+        # 1. Campus pass QR on /profile decodes to public /verify/pass/<token>
+        prof_html = self.browser.get("/profile").get_data(as_text=True)
+        pass_decoded = decode_rendered_qr(prof_html, index=0)
+        self.assertIn("/verify/pass/", pass_decoded)
+        anon = self.app.test_client()
+        pass_verify = anon.get(urlsplit(pass_decoded).path)
+        self.assertEqual(pass_verify.status_code, 200)
+        self.assertIn("Семестр ID", pass_verify.get_data(as_text=True))
+        self.assertIn("Маякова В. И.", pass_verify.get_data(as_text=True))
+
+        # 2. Certificate QR on /requests/<id>/document decodes to public /verify/<token>
+        reqs_page = self.browser.get("/requests")
+        issued = self.browser.post("/requests/instant/study", data={
+            "_csrf": token(reqs_page),
+            "nonce": token(reqs_page, "nonce"),
+        })
+        doc_html = self.browser.get(urlsplit(issued.location).path).get_data(as_text=True)
+        # index=0 on signed-in page is doc_qr (pass modal is at end of base.html)
+        doc_decoded = decode_rendered_qr(doc_html, index=0)
+        self.assertRegex(doc_decoded, r"^http://localhost/verify/[A-Za-z0-9_-]+$")
+        self.assertEqual(anon.get(urlsplit(doc_decoded).path).status_code, 200)
+
+        # 3. Guest pass QR on /campus decodes to public /verify/guest/<id>
+        campus_page = self.browser.get("/campus")
+        vdate = re.search(r'<select id="guest_date" name="visit_date">\s*<option value="([^"]+)"', campus_page.get_data(as_text=True))[1]
+        self.browser.post("/campus/guest-pass", data={
+            "_csrf": token(campus_page),
+            "guest_name": "Маяков Илья Сергеевич",
+            "visit_date": vdate,
+            "location": "Студдом № 2",
+        })
+        campus_after = self.browser.get("/campus").get_data(as_text=True)
+        guest_decoded = decode_rendered_qr(campus_after, index=0)
+        self.assertIn("/verify/guest/", guest_decoded)
+        guest_verify = anon.get(urlsplit(guest_decoded).path)
+        self.assertEqual(guest_verify.status_code, 200)
+        self.assertIn("Маяков И. С.", guest_verify.get_data(as_text=True))
+
+    def test_navigator_honest_empty_state_without_confident_misses(self):
+        self.login()
+        for q in ("как перевестись на бюджет", "хочу академ", "где находится столовая"):
+            html = self.browser.get(f"/navigator?q={q}").get_data(as_text=True)
+            self.assertNotIn("data-nav-card", html, msg=q)
+            self.assertIn("Не нашёл готового сценария", html, msg=q)
+            self.assertIn("Спросить ассистента", html, msg=q)
+            self.assertIn("Написать в учебный офис", html, msg=q)
+
+        # Prefill from navigator empty state into appeal form
+        appeal_html = self.browser.get("/requests/new/appeal?q=как+перевестись+на+бюджет").get_data(as_text=True)
+        self.assertIn("как перевестись на бюджет", appeal_html)
+
+    def test_reset_demo_cli_restores_seed_and_preserves_password_hashes(self):
+        custom_cfg = {
+            **self.config,
+            "DATABASE": str(Path(self.sandbox.name) / "reset_test.sqlite3"),
+            "DEMO_PASSWORDS": ("Custom-Lera-99", "Custom-Misha-99", "Custom-Dean-99"),
+        }
+        custom_app = create_app(custom_cfg)
+        client = custom_app.test_client()
+        login_res = client.post("/login", data={
+            "_csrf": token(client.get("/login")),
+            "email": "lera@demo.example",
+            "password": "Custom-Lera-99",
+        })
+        self.assertEqual(login_res.status_code, 303)
+
+        # Pollute DB with extra military certificates
+        for _ in range(3):
+            rp = client.get("/requests")
+            client.post("/requests/instant/military", data={"_csrf": token(rp), "nonce": token(rp, "nonce")})
+        self.assertGreaterEqual(client.get("/requests").get_data(as_text=True).count("Справка в военкомат (Прил. № 4)"), 4)
+
+        # Run flask reset-demo CLI
+        res = custom_app.test_cli_runner().invoke(args=["reset-demo"])
+        self.assertEqual(res.exit_code, 0)
+        self.assertIn("Demo data reset complete", res.output)
+
+        # Extra certificates are gone (only Lera's 2 seeded items remain in .request-row)
+        reqs_after = client.get("/requests").get_data(as_text=True)
+        self.assertEqual(reqs_after.count("request-row"), 2)
+
+        # Custom password hash from env is preserved
+        client2 = custom_app.test_client()
+        self.assertEqual(client2.post("/login", data={
+            "_csrf": token(client2.get("/login")),
+            "email": "lera@demo.example",
+            "password": "Custom-Lera-99",
+        }).status_code, 303)
 
 
 if __name__ == "__main__":

@@ -173,6 +173,72 @@ def _seed_charges(db, stamp):
         )
 
 
+def _seed_requests(db, stamp):
+    db.executemany(
+        "INSERT INTO requests VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (secrets.token_hex(16), 1, "grades", "digital", "", stamp - 45 * 60, stamp - 43 * 60, "seed-1", "", "approved", secrets.token_urlsafe(16), 0),
+            (secrets.token_hex(16), 2, "study", "office", "", stamp - 60 * 60, stamp - 57 * 60, "seed-2", "", "approved", secrets.token_urlsafe(16), 0),
+            (
+                secrets.token_hex(16),
+                2,
+                "appeal",
+                "digital",
+                "Прошу включить факультатив по дипломатическому протоколу в индивидуальный план осеннего семестра.",
+                stamp - 18 * 60,
+                stamp + 90 * 60,
+                "seed-3",
+                "",
+                "pending",
+                secrets.token_urlsafe(16),
+                0,
+            ),
+            (
+                secrets.token_hex(16),
+                1,
+                "pgas",
+                "digital",
+                "Номинация: учебная и проектная деятельность (победитель кейс-чемпионата по продуктовой аналитике, рейтинг 90,3).",
+                stamp - 10 * 60,
+                stamp + 120 * 60,
+                "seed-4",
+                "",
+                "pending",
+                secrets.token_urlsafe(16),
+                0,
+            ),
+        ],
+    )
+
+
+def reset_demo_data(db):
+    """Reset mutable demo records while preserving students and their password_hash values."""
+    stamp = int(now().timestamp())
+    existing_tables = {
+        row["name"] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+    }
+    mutable_tables = (
+        "notification_reads",
+        "requests",
+        "charges",
+        "guest_passes",
+        "room_bookings",
+        "office_slots",
+        "room_overrides",
+        "staff_notices",
+        "login_attempts",
+        "assistant_messages",
+        "assistant_gaps",
+    )
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        for tbl in mutable_tables:
+            if tbl in existing_tables:
+                db.execute(f"DELETE FROM {tbl}")
+        _seed_requests(db, stamp)
+        _seed_charges(db, stamp)
+
+
 def initialize(path, password_hashes):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     db = connect(path)
@@ -190,41 +256,7 @@ def initialize(path, password_hashes):
                         "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (*student, password_hash),
                     )
-                db.executemany(
-                    "INSERT INTO requests VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [
-                        (secrets.token_hex(16), 1, "grades", "digital", "", stamp - 45 * 60, stamp - 43 * 60, "seed-1", "", "approved", secrets.token_urlsafe(16), 0),
-                        (secrets.token_hex(16), 2, "study", "office", "", stamp - 60 * 60, stamp - 57 * 60, "seed-2", "", "approved", secrets.token_urlsafe(16), 0),
-                        (
-                            secrets.token_hex(16),
-                            2,
-                            "appeal",
-                            "digital",
-                            "Прошу включить факультатив по дипломатическому протоколу в индивидуальный план осеннего семестра.",
-                            stamp - 18 * 60,
-                            stamp + 90 * 60,
-                            "seed-3",
-                            "",
-                            "pending",
-                            secrets.token_urlsafe(16),
-                            0,
-                        ),
-                        (
-                            secrets.token_hex(16),
-                            1,
-                            "pgas",
-                            "digital",
-                            "Номинация: учебная и проектная деятельность (победитель кейс-чемпионата по продуктовой аналитике, рейтинг 90,3).",
-                            stamp - 10 * 60,
-                            stamp + 120 * 60,
-                            "seed-4",
-                            "",
-                            "pending",
-                            secrets.token_urlsafe(16),
-                            0,
-                        ),
-                    ],
-                )
+                _seed_requests(db, stamp)
             elif 3 not in existing and len(password_hashes) >= 3:
                 db.execute(
                     "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

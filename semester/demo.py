@@ -1,7 +1,10 @@
 """Invented, repeatable demo data. Dates follow the academic week in Moscow."""
 from datetime import date, datetime, time, timedelta
 from hashlib import sha256
+import re
 from zoneinfo import ZoneInfo
+
+import segno
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 MONTH = "января февраля марта апреля мая июня июля августа сентября октября ноября декабря".split()
@@ -288,9 +291,12 @@ PREFILL_TEMPLATES = {
 
 
 def mask_full_name(full_name):
-    """Mask 'Валерия Ильинична Маякова' -> 'Маякова В. И.' for public /verify pages."""
+    """Mask 'Валерия Ильинична Маякова' or 'Маяков Илья Сергеевич' -> 'Маякова В. И.' / 'Маяков И. С.'."""
     parts = [p for p in (full_name or "").split() if p]
     if len(parts) >= 3:
+        patronymic_endings = ("ович", "евич", "ична", "овна", "евна", "ич", "кызы", "оглы")
+        if parts[-1].lower().endswith(patronymic_endings):
+            return f"{parts[0]} {parts[1][0]}. {parts[2][0]}."
         return f"{parts[-1]} {parts[0][0]}. {parts[1][0]}."
     if len(parts) == 2:
         return f"{parts[-1]} {parts[0][0]}."
@@ -544,7 +550,8 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
     return [
         {
             "slug": "dorm-pay",
-            "keywords": "общага общежитие оплата заплатить договор квитанция долг проживание сбп",
+            "keywords": "общага общежитие студдом проживание найма квартплата оплатить договор квитанция сбп",
+            "triggers": ("общаг", "общежит", "студдом", "проживан", "найм", "квартплат", "квитанц"),
             "question": "Оплатить общежитие и получить квитанцию",
             "badge": fmt_rub(unpaid_dorm["amount"]) if unpaid_dorm else "Оплачено",
             "badge_tone": "warn" if unpaid_dorm else "ok",
@@ -560,7 +567,8 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
         },
         {
             "slug": "military",
-            "keywords": "военкомат отсрочка призыв приложение 4 справка воинский учет армия",
+            "keywords": "военкомат отсрочка призыв приложение воинский учет армия повестка",
+            "triggers": ("военком", "отсрочк", "призыв", "воинск", "арми", "повестк", "приложени"),
             "question": "Нужна справка в военкомат для отсрочки",
             "badge": "За 1 сек",
             "badge_tone": "ok",
@@ -579,7 +587,8 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
         },
         {
             "slug": "illness",
-            "keywords": "заболел болезнь медсправка 095 зачет экзамен врач больничный температура",
+            "keywords": "заболел болезнь болел медсправка 095 врач больничный температура поликлиника",
+            "triggers": ("заболел", "болезн", "болел", "медсправ", "095", "врач", "больничн", "температур", "поликлиник"),
             "question": "Заболел перед зачётом или экзаменом",
             "badge": "Регламент 5 дней",
             "badge_tone": "",
@@ -598,7 +607,8 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
         },
         {
             "slug": "missed-class",
-            "keywords": "пропустил пару пропуск опоздал отработка объяснительная посещаемость семинар",
+            "keywords": "пропустил пару пропуск пары опоздал отработка объяснительная посещаемость прогул",
+            "triggers": ("пропустил", "опоздал", "отработк", "объяснительн", "посещаем", "прогул"),
             "question": "Пропустил пару — что делать",
             "badge": f"Группа {student['student_group']}",
             "badge_tone": "",
@@ -617,7 +627,8 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
         },
         {
             "slug": "scholarship",
-            "keywords": "стипендия пгас деньги выплата доход матпомощь карта когда придет повышенная",
+            "keywords": "стипендия пгас выплата доход матпомощь повышенная материальная помощь",
+            "triggers": ("стипенд", "пгас", "выплат", "доход", "матпомощ", "повышенн"),
             "question": "Хочу повышенную стипендию (ПГАС) или справку о доходах",
             "badge": fmt_rub(scholar["total_monthly"]) + "/мес",
             "badge_tone": "ok",
@@ -637,7 +648,8 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
         },
         {
             "slug": "guest-cowork",
-            "keywords": "гость родители пропуск кампус коворкинг переговорная бронь окно комната",
+            "keywords": "гость гостевой родители пропуск коворкинг переговорная бокс забронировать",
+            "triggers": ("гост", "родител", "коворкинг", "переговорн", "бокс", "медиастуд"),
             "question": "Привести гостя в кампус или занять переговорную",
             "badge": "Онлайн-пропуск",
             "badge_tone": "",
@@ -656,7 +668,8 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
         },
         {
             "slug": "curriculum",
-            "keywords": "факультатив язык пересдача бегунок план иуп перезачет предмет группа",
+            "keywords": "факультатив второй язык пересдача бегунок иуп перезачет электив",
+            "triggers": ("факультатив", "пересдач", "бегунок", "иуп", "перезачет", "электив", "второй язык"),
             "question": "Сменить факультатив, второй язык или взять бегунок",
             "badge": f"Группа {student['student_group']}",
             "badge_tone": "",
@@ -676,66 +689,81 @@ def build_navigator_situations(student, snap, charges, dorm, scholar):
     ]
 
 
+_NAV_STOPWORDS = frozenset({
+    "как", "что", "где", "когда", "или", "для", "при", "под", "над", "про",
+    "без", "мне", "мой", "моя", "мои", "хочу", "нужно", "надо", "можно",
+    "если", "есть", "нет", "это", "все", "его", "она", "они", "делать",
+    "взять", "получить", "подать", "будет", "курс", "курсе", "деканат",
+})
+
+# Queries that require full regulations / individual review rather than the 7 express cards
+_NAV_OUT_OF_PLAYBOOK = (
+    "академ",
+    "бюджет",
+    "отчислен",
+    "восстановлен",
+    "другой вуз",
+    "смена программ",
+    "перевод на",
+    "перевестись",
+)
+
+
 def match_navigator_query(query, situations):
-    q = (query or "").strip().lower()
-    if not q:
+    raw = (query or "").strip().lower().replace("ё", "е")
+    if not raw:
         return situations
-    tokens = [tok for tok in q.replace("?", " ").replace(",", " ").split() if len(tok) >= 2]
+    # Exact question match (e.g. clicking a shortcut link on Home)
+    for item in situations:
+        if raw == item["question"].strip().lower().replace("ё", "е"):
+            return [item]
+    # Explicit out-of-playbook regulatory questions must not produce confident false positives
+    if any(marker in raw for marker in _NAV_OUT_OF_PLAYBOOK):
+        return []
+    tokens = [
+        tok for tok in re.findall(r"[а-яa-z0-9]+", raw)
+        if (len(tok) >= 3 or tok in {"qr", "095"}) and tok not in _NAV_STOPWORDS
+    ]
+    if not tokens:
+        return []
     scored = []
     for item in situations:
-        hay = f"{item['question']} {item['keywords']} {item['summary']}".lower()
-        score = sum(3 if tok in item["keywords"] else (2 if tok in hay else 0) for tok in tokens)
-        if q in hay:
-            score += 4
-        if score > 0:
+        triggers = item.get("triggers", ())
+        score = 0
+        for trig in triggers:
+            if " " in trig:
+                if trig in raw:
+                    score += 5
+            elif any(tok.startswith(trig) or trig.startswith(tok[:5]) and len(tok) >= 5 for tok in tokens):
+                score += 4
+        if score >= 4:
             scored.append((score, item))
     if not scored:
-        return situations[:2]
+        return []
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return [item for _, item in scored]
 
 
-def qr_svg_path(seed_text):
-    """Build a crisp deterministic 21x21 matrix path for campus pass & certificate verification."""
-    size = 21
-    digest = sha256(seed_text.encode("utf-8")).digest()
-    bits = "".join(f"{byte:08b}" for byte in digest * 3)
-    bit_idx = 0
-
-    def finder(r, c, top, left):
-        lr, lc = r - top, c - left
-        if 0 <= lr < 7 and 0 <= lc < 7:
-            if lr in (0, 6) or lc in (0, 6):
-                return True
-            if 2 <= lr <= 4 and 2 <= lc <= 4:
-                return True
-            return False
-        return None
-
+def qr_svg_path(payload_text):
+    """Encode payload_text as a real ISO/IEC 18004 scannable QR matrix via segno."""
+    qr = segno.make(payload_text, error="m", boost_error=False)
+    matrix = qr.matrix
+    n = len(matrix)
+    border = 4
+    total = n + 2 * border
     parts = []
-    for r in range(size):
-        for c in range(size):
-            if (r == 7 and c < 8) or (c == 7 and r < 8):
-                continue
-            if (r == 7 and c >= 13) or (c == 13 and r < 8):
-                continue
-            if (r == 13 and c < 8) or (c == 7 and r >= 13):
-                continue
-
-            val = finder(r, c, 0, 0)
-            if val is None:
-                val = finder(r, c, 0, 14)
-            if val is None:
-                val = finder(r, c, 14, 0)
-            if val is None:
-                if r == 6 or c == 6:
-                    val = (r + c) % 2 == 0
-                else:
-                    val = bits[bit_idx] == "1"
-                    bit_idx += 1
-            if val:
-                parts.append(f"M{c} {r}h1v1h-1z")
-    return "".join(parts)
+    for r, row in enumerate(matrix):
+        y = r + border
+        c = 0
+        while c < n:
+            if row[c]:
+                start = c
+                while c < n and row[c]:
+                    c += 1
+                parts.append(f"M{start + border} {y}h{c - start}v1h-{c - start}z")
+            else:
+                c += 1
+    return {"dim": total, "path": "".join(parts), "url": payload_text}
 
 
 def build_week_ics(student, start_day, overrides=None):

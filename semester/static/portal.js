@@ -243,31 +243,48 @@
     });
   });
 
-  // Live instant filter on /navigator
+  // Live instant filter on /navigator (honest empty state when no trigger matches)
   const navLiveInput = document.querySelector("[data-nav-live-input]");
   if (navLiveInput) {
     const cards = document.querySelectorAll("[data-nav-card]");
+    const emptyBox = document.querySelector("[data-nav-empty]");
+    const askBtn = document.querySelector("[data-nav-ask-btn]");
+    const officeBtn = document.querySelector("[data-nav-office-btn]");
+    const outOfPlaybook = ["академ", "бюджет", "отчислен", "восстановлен", "другой вуз", "смена программ", "перевестись"];
     navLiveInput.addEventListener("input", () => {
-      const q = navLiveInput.value.trim().toLowerCase();
-      const tokens = q.split(/\s+/).filter((t) => t.length >= 2);
-      if (!tokens.length) {
+      const raw = navLiveInput.value.trim();
+      const q = raw.toLowerCase().replace(/ё/g, "е");
+      if (askBtn) {
+        askBtn.setAttribute("href", raw ? `/assistant?q=${encodeURIComponent(raw)}` : "/assistant");
+      }
+      if (officeBtn) {
+        officeBtn.setAttribute("href", raw ? `/requests/new/appeal?q=${encodeURIComponent(raw)}` : "/requests/new/appeal");
+      }
+      if (!q) {
         cards.forEach((c) => {
           c.hidden = false;
         });
+        if (emptyBox) emptyBox.hidden = true;
         return;
       }
+      if (outOfPlaybook.some((m) => q.includes(m))) {
+        cards.forEach((c) => {
+          c.hidden = true;
+        });
+        if (emptyBox) emptyBox.hidden = false;
+        return;
+      }
+      const tokens = (q.match(/[а-яa-z0-9]+/g) || []).filter((t) => t.length >= 3 || t === "qr" || t === "095");
       let matchedAny = false;
       cards.forEach((c) => {
-        const hay = c.getAttribute("data-nav-keywords") || "";
-        const hit = tokens.some((tok) => hay.includes(tok));
+        const triggers = (c.getAttribute("data-nav-triggers") || "").split("|").filter(Boolean);
+        const hit = tokens.length > 0 && triggers.some((trig) =>
+          trig.includes(" ") ? q.includes(trig) : tokens.some((tok) => tok.startsWith(trig))
+        );
         c.hidden = !hit;
         if (hit) matchedAny = true;
       });
-      if (!matchedAny) {
-        cards.forEach((c) => {
-          c.hidden = false;
-        });
-      }
+      if (emptyBox) emptyBox.hidden = matchedAny;
     });
   }
 

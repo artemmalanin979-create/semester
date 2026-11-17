@@ -51,10 +51,10 @@
 </span>
 {%- endmacro %}
 
-{% macro qr_code(path_data, size=96) -%}
-<svg class="qr-svg" width="{{ size }}" height="{{ size }}" viewBox="-1 -1 23 23" role="img" aria-label="Проверочный матричный код">
-  <rect x="-1" y="-1" width="23" height="23" rx="1.5" fill="#FFFFFF"/>
-  <path d="{{ path_data }}" fill="#141716"/>
+{% macro qr_code(qr, size=96) -%}
+<svg class="qr-svg" width="{{ size }}" height="{{ size }}" viewBox="0 0 {{ qr.dim }} {{ qr.dim }}" shape-rendering="crispEdges" data-qr-url="{{ qr.url }}" role="img" aria-label="Проверочный QR-код">
+  <rect x="0" y="0" width="{{ qr.dim }}" height="{{ qr.dim }}" rx="2" fill="#FFFFFF"/>
+  <path d="{{ qr.path }}" fill="#141716"/>
 </svg>
 {%- endmacro %}
 
