@@ -9,8 +9,8 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Семестр{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='9') }}">
-  <script defer src="{{ url_for('static', filename='portal.js', v='9') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='10') }}">
+  <script defer src="{{ url_for('static', filename='portal.js', v='10') }}"></script>
 </head>
 <body class="{{ 'signed-in' if g.student else 'signed-out' }}">
   <a class="skip-link" href="#content">К содержимому</a>
@@ -34,6 +34,8 @@
         <span class="nav-count warn-count num" aria-label="Счетов к оплате: {{ unpaid_count }}">{{ unpaid_count }}</span>
         {% elif endpoint == 'staff_dashboard' and pending_staff %}
         <span class="nav-count warn-count num" aria-label="Ожидают: {{ pending_staff }}">{{ pending_staff }}</span>
+        {% elif endpoint == 'staff_assistant' and gaps_staff %}
+        <span class="nav-count num" aria-label="Тем без регламента: {{ gaps_staff }}">{{ gaps_staff }}</span>
         {% endif %}
       </a>
       {% endfor %}
@@ -68,7 +70,10 @@
         {{ icon('search', 18) }}
       </button>
       {% if not is_staff %}
-      <a class="icon-btn" href="{{ url_for('navigator') }}" aria-label="Умный навигатор деканата" title="Умный навигатор ситуаций">
+      <a class="icon-btn assistant-top-btn" href="{{ url_for('assistant_view') }}" aria-label="Спроси деканат · ИИ по регламентам" title="Спроси деканат · ИИ по регламентам">
+        {{ icon('spark', 18) }}
+      </a>
+      <a class="icon-btn nav-top-btn" href="{{ url_for('navigator') }}" aria-label="Умный навигатор деканата" title="Умный навигатор ситуаций">
         {{ icon('compass', 18) }}
       </a>
       {% endif %}
@@ -136,7 +141,7 @@
         </a>
         {% endfor %}
       </div>
-      <p class="cmd-empty" id="cmd-empty" hidden>Совпадений нет. Попробуйте запрос в Умном навигаторе.</p>
+      <p class="cmd-empty" id="cmd-empty" hidden>Совпадений нет. Спросите ассистента по регламентам в разделе «Спроси деканат».</p>
     </div>
   </dialog>
 

@@ -389,4 +389,34 @@
       if (cmdEmpty) cmdEmpty.hidden = visible > 0;
     });
   }
+
+  // Assistant skeleton state during retrieval/LLM call
+  const assistantSkeleton = document.getElementById("assistant-skeleton");
+  if (assistantSkeleton) {
+    document.querySelectorAll("[data-assistant-form]").forEach((form) => {
+      form.addEventListener("submit", () => {
+        assistantSkeleton.hidden = false;
+        assistantSkeleton.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
+  }
+
+  // Instant client-side filter on /rules
+  const rulesInput = document.querySelector("[data-rules-input]");
+  if (rulesInput) {
+    const docs = document.querySelectorAll("[data-rule-doc]");
+    rulesInput.addEventListener("input", () => {
+      const q = rulesInput.value.trim().toLowerCase().replace(/ё/g, "е");
+      docs.forEach((doc) => {
+        let anyClause = false;
+        doc.querySelectorAll("[data-rule-clause]").forEach((cl) => {
+          const hay = (cl.getAttribute("data-rule-search") || "").replace(/ё/g, "е");
+          const hit = !q || hay.includes(q);
+          cl.hidden = !hit;
+          if (hit) anyClause = true;
+        });
+        doc.hidden = !anyClause;
+      });
+    });
+  }
 })();

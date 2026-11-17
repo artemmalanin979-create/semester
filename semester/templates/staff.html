@@ -343,12 +343,12 @@
 
           <div class="field-group">
             <label for="announce_title">Заголовок</label>
-            <input type="text" id="announce_title" name="title" minlength="4" maxlength="120" placeholder="Например: Приём документов на ПГАС до пятницы" required>
+            <input type="text" id="announce_title" name="title" value="{{ prefill_title or '' }}" minlength="4" maxlength="120" placeholder="Например: Приём документов на ПГАС до пятницы" required>
           </div>
 
           <div class="field-group">
             <label for="announce_body">Текст уведомления</label>
-            <textarea id="announce_body" name="body" rows="4" minlength="8" maxlength="400" placeholder="Укажите аудиторию, сроки и порядок действий для студентов…" required></textarea>
+            <textarea id="announce_body" name="body" rows="4" minlength="8" maxlength="400" placeholder="Укажите аудиторию, сроки и порядок действий для студентов…" required>{{ prefill_body or '' }}</textarea>
           </div>
 
           <button type="submit" class="btn btn-primary btn-full">Опубликовать уведомление</button>
@@ -384,6 +384,55 @@
       </div>
     </section>
   </div>
+</div>
+
+{% elif tab == 'assistant' %}
+<div class="content-stack">
+  <section class="surface rules-disclaimer" aria-label="Политика обезличивания">
+    <span class="row-glyph">{{ icon('shield', 18) }}</span>
+    <p>Строго обезличенная сводка: сюда попадают только формулировки вопросов, на которые в 8 положениях «Семестра» не нашлось прямого пункта. Имена, почта, телефоны и номера студенческих билетов не сохраняются.</p>
+  </section>
+
+  <section aria-labelledby="gaps-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="gaps-heading">Вопросы студентов без ответа в регламентах ({{ gaps|length }})</h2>
+        <p>Темы, по которым стоит выпустить официальное разъяснение потокам или дополнить положение</p>
+      </div>
+      <a class="btn btn-ghost compact" href="{{ url_for('rules_view') }}">
+        {{ icon('book', 15) }}<span>Открыть регламенты</span>
+      </a>
+    </div>
+
+    <div class="surface boxed-list">
+      {% for gap in gaps %}
+      <article class="staff-item">
+        <div class="staff-item-head">
+          <div class="staff-item-title">
+            <span class="row-glyph">{{ icon('message', 18) }}</span>
+            <div>
+              <strong>{{ gap.question_sanitized }}</strong>
+              <small>{{ gap.topic }} · обновлено {{ fmt_dt(gap.updated_at) }}</small>
+            </div>
+          </div>
+          {{ state_badge('Запросов: ' ~ gap.hits, 'warn' if gap.hits >= 2 else '') }}
+        </div>
+
+        <div class="staff-resolve-btns gap-action-row">
+          <a class="btn btn-primary compact" href="{{ url_for('staff_notices', title='Разъяснение деканата: ' ~ gap.topic, body='По вопросу «' ~ gap.question_sanitized[:140] ~ '»: ') }}">
+            {{ icon('bell', 15) }}<span>Опубликовать разъяснение</span>
+          </a>
+          <form method="post" action="{{ url_for('staff_dismiss_gap', gap_id=gap.id) }}">
+            {{ csrf_field(csrf) }}
+            <button type="submit" class="btn btn-ghost compact">Отметить закрытым</button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <p class="empty">Незакрытых пробелов в базе регламентов сейчас нет.</p>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 {% endif %}
 {% endblock %}

@@ -6,8 +6,8 @@
   <a class="icon-btn bordered" href="{{ url_for('schedule_ics', date=day.isoformat()) }}" aria-label="Скачать расписание (.ics)" title="Экспорт расписания в календарь (.ics)">
     {{ icon('download', 18) }}
   </a>
-  <a class="btn btn-ghost" href="{{ url_for('navigator') }}">
-    {{ icon('compass', 16) }}<span>Помощник</span>
+  <a class="btn btn-ghost" href="{{ url_for('assistant_view') }}">
+    {{ icon('spark', 16) }}<span>Спроси деканат</span>
   </a>
   <a class="btn btn-primary" href="{{ url_for('requests_list') }}">
     {{ icon('plus', 16) }}<span>Выпустить справку</span>
@@ -153,6 +153,32 @@
   </div>
 
   <div class="dashboard-side-stack">
+    <section aria-labelledby="ask-dean-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="ask-dean-heading">Спроси деканат</h2>
+          <p>Ответы со ссылками [П. X.Y] на регламенты</p>
+        </div>
+        <a class="icon-btn" href="{{ url_for('rules_view') }}" aria-label="Сборник регламентов" title="Сборник регламентов">
+          {{ icon('book', 17) }}
+        </a>
+      </div>
+      <div class="surface detail-panel home-ask-widget">
+        <form method="post" action="{{ url_for('assistant_ask') }}" class="mini-ask-form">
+          {{ csrf_field(csrf) }}
+          <input type="text" name="question" maxlength="500" placeholder="Академ, перевод на бюджет, 095/у…" aria-label="Вопрос по регламентам" required>
+          <button type="submit" class="icon-btn bordered mini-ask-submit" aria-label="Спросить ассистента" title="Спросить ассистента">
+            {{ icon('send', 16) }}
+          </button>
+        </form>
+        <div class="chip-row">
+          {% for p in assistant_prompts[:3] %}
+          <a class="quick-chip" href="{{ url_for('assistant_view', q=p) }}">{{ p }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
     <section aria-labelledby="attention-heading">
       <div class="section-heading">
         <div>

@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, pageheading, state_badge %}
+{% block title %}Регламенты «Семестра» · Семестр{% endblock %}
+{% block content %}
+<a class="text-link back-link" href="{{ url_for('staff_assistant') if is_staff else url_for('assistant_view') }}">
+  {{ icon('left', 16) }}<span>{{ 'К пробелам регламентов' if is_staff else 'К ассистенту «Спроси деканат»' }}</span>
+</a>
+{% call pageheading('Положения и регламенты «Семестра»', 'Нормативная база учебного процесса, стипендиального обеспечения, студенческих домов и воинского учёта.') %}
+  {% if not is_staff %}
+  <a class="btn btn-primary" href="{{ url_for('assistant_view') }}">
+    {{ icon('spark', 16) }}<span>Спросить по базе</span>
+  </a>
+  {% endif %}
+{% endcall %}
+
+<section class="surface rules-disclaimer" aria-label="Статус нормативной базы">
+  <span class="row-glyph">{{ icon('info', 18) }}</span>
+  <p>Вымышленный демонстрационный свод положений для конкурсного концепта «Семестр» (MGIMO × AI Challenge). Статьи и пункты не являются официальными локальными актами вуза и служат проверяемым корпусом для цитирования ИИ-ассистента.</p>
+</section>
+
+<section class="surface detail-panel mt-16" aria-label="Поиск по пунктам положений">
+  <form method="get" action="{{ url_for('rules_view') }}" class="navigator-form">
+    <div class="navigator-input-row">
+      <input type="search" name="q" value="{{ query }}" data-rules-input placeholder="Поиск по номеру пункта (например, 4.2) или теме: пересдача, 095/у, академ, бюджет, ПГАС…" autocomplete="off">
+      <button type="submit" class="btn btn-primary">Найти пункты</button>
+      {% if query %}<a class="btn btn-ghost" href="{{ url_for('rules_view') }}">Сбросить</a>{% endif %}
+    </div>
+    {% if documents %}
+    <div class="chip-row" aria-label="Разделы сборника">
+      {% for doc in documents %}
+      <a class="quick-chip" href="#doc-{{ doc.slug }}"><span class="num">№ {{ loop.index }}</span> · {{ doc.short }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </form>
+</section>
+
+<div class="rules-stack mt-24">
+  {% for doc in documents %}
+  <section class="surface detail-panel rule-doc-card" id="doc-{{ doc.slug }}" data-rule-doc>
+    <div class="detail-head rule-doc-head">
+      <div>
+        <span class="rule-doc-meta num">{{ doc.code }} · ред. от {{ doc.updated }}</span>
+        <h2>{{ doc.title }}</h2>
+      </div>
+      {{ state_badge(doc.clauses|length ~ ' п.', '') }}
+    </div>
+
+    <div class="rule-clauses-list">
+      {% for cl in doc.clauses %}
+      <article class="rule-clause" id="{{ cl.anchor }}" data-rule-clause data-rule-search="{{ (cl.id ~ ' ' ~ cl.title ~ ' ' ~ cl.keywords ~ ' ' ~ cl.text)|lower }}">
+        <div class="rule-clause-top">
+          <a class="rule-clause-id num" href="#{{ cl.anchor }}">П. {{ cl.id }}</a>
+          <h3>{{ cl.title }}</h3>
+        </div>
+        <p class="rule-clause-text">{{ cl.text }}</p>
+        {% if not is_staff and cl.actions %}
+        <div class="rule-clause-actions">
+          {% for act_label, act_url in cl.actions %}
+          <a class="text-link" href="{{ act_url }}"><span>{{ act_label }}</span>{{ icon('arrow', 14) }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <div class="surface detail-panel">
+    <p class="empty">По запросу «{{ query }}» подходящих пунктов не найдено. Сбросьте фильтр или задайте вопрос в разделе «Спроси деканат».</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

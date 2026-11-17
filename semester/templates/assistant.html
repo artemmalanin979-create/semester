@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading, state_badge %}
+{% block title %}Спроси деканат · Семестр{% endblock %}
+{% block content %}
+<a class="text-link back-link" href="{{ url_for('home') }}">{{ icon('left', 16) }}<span>На главную</span></a>
+{% call pageheading('Спроси деканат', 'Ответы строго по 8 положениям «Семестра» с проверкой сносок [П. X.Y] и учётом вашего курса, группы и договоров.') %}
+  <a class="btn btn-ghost" href="{{ url_for('rules_view') }}">
+    {{ icon('book', 16) }}<span>Все регламенты</span>
+  </a>
+  {% if messages %}
+  <form method="post" action="{{ url_for('assistant_clear') }}">
+    {{ csrf_field(csrf) }}
+    <button type="submit" class="btn btn-ghost">{{ icon('refresh', 15) }}<span>Новый диалог</span></button>
+  </form>
+  {% endif %}
+{% endcall %}
+
+{% if error %}
+<p class="form-error" role="alert">{{ icon('info', 17) }}<span>{{ error }}</span></p>
+{% endif %}
+
+<div class="assistant-shell">
+  <section class="surface assistant-guardrail" aria-label="Режим работы ассистента">
+    <div class="assistant-guardrail-copy">
+      <span class="row-glyph">{{ icon('spark', 18) }}</span>
+      <div>
+        <strong>Контроль цитирования без домыслов</strong>
+        <p>Ассистент ищет релевантные статьи по 69 пунктам положений и оставляет только подтверждённые ссылки вида <span class="num">[П. X.Y]</span>. Если нормы в базе нет — прямо сообщает об этом и даёт переход в учебный офис.</p>
+      </div>
+    </div>
+    {{ state_badge('GigaChat + BM25' if has_gigachat else 'Поиск по регламентам · BM25', 'ok') }}
+  </section>
+
+  <section class="surface detail-panel assistant-prompts-panel" aria-label="Быстрые вопросы по регламентам">
+    <div class="assistant-prompts-head">
+      <strong>Проверить частый вопрос в 1 клик</strong>
+      <span class="num">Группа {{ g.student.student_group }} · {{ g.student.course }} курс</span>
+    </div>
+    <form method="post" action="{{ url_for('assistant_ask') }}" class="chip-row" data-assistant-form>
+      {{ csrf_field(csrf) }}
+      {% for p in prompts %}
+      <button type="submit" name="question" value="{{ p }}" class="quick-chip">{{ p }}</button>
+      {% endfor %}
+    </form>
+  </section>
+
+  <section class="assistant-feed" id="assistant-feed" aria-label="История ответов по регламентам">
+    {% for msg in messages %}
+    <article class="assistant-turn" id="msg-{{ msg.id }}">
+      <div class="assistant-user-row">
+        <div class="assistant-user-bubble">
+          <small class="num">Вы · {{ msg.time_label }}</small>
+          <p>{{ msg.question }}</p>
+        </div>
+      </div>
+
+      <div class="surface assistant-reply{% if not msg.found %} is-not-found{% endif %}">
+        <div class="assistant-reply-head">
+          <span class="assistant-author">
+            <span class="row-glyph">{{ icon('spark', 16) }}</span>
+            <strong>Справочный контур деканата</strong>
+          </span>
+          {{ state_badge(msg.mode_label, 'ok' if msg.found else 'warn') }}
+        </div>
+
+        <div class="assistant-reply-body">
+          {% for para in msg.paragraphs %}
+          <p>{{ para }}</p>
+          {% endfor %}
+        </div>
+
+        {% if msg.citations %}
+        <div class="assistant-citations" aria-label="Источники из положений">
+          <span class="assistant-subhead">Проверенные пункты положений</span>
+          <div class="cite-grid">
+            {% for cite in msg.citations %}
+            <a class="cite-card" href="{{ cite.url }}">
+              <span class="cite-code num">П. {{ cite.id }}</span>
+              <span class="cite-title">{{ cite.title }}</span>
+              {{ icon('up-right', 14) }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="assistant-reply-foot">
+          {% if msg.actions %}
+          <div class="assistant-actions">
+            {% for act in msg.actions %}
+            <a class="btn {{ 'btn-primary' if loop.first else 'btn-ghost' }} compact" href="{{ act.url }}">
+              <span>{{ act.label }}</span>{% if loop.first %}{{ icon('arrow', 14) }}{% endif %}
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <form method="post" action="{{ url_for('assistant_feedback', msg_id=msg.id) }}" class="assistant-rate-form" aria-label="Оценка точности ответа">
+            {{ csrf_field(csrf) }}
+            <span class="rate-caption">Ответ помог?</span>
+            <button type="submit" name="rating" value="1" class="rate-btn{% if msg.rating == 1 %} is-selected{% endif %}" aria-label="Полезный ответ" title="Полезный ответ">
+              {{ icon('thumb-up', 16) }}
+            </button>
+            <button type="submit" name="rating" value="-1" class="rate-btn{% if msg.rating == -1 %} is-selected is-negative{% endif %}" aria-label="Неточный ответ" title="Неточный ответ">
+              {{ icon('thumb-down', 16) }}
+            </button>
+          </form>
+        </div>
+      </div>
+    </article>
+    {% else %}
+    <div class="surface detail-panel assistant-empty">
+      <strong>Задайте вопрос своими словами</strong>
+      <p>Например: «можно ли взять академ на 2 курсе?», «как перевестись на бюджет?», «сколько дней на подачу 095/у после болезни?» или «что будет за просрочку оплаты общежития?».</p>
+    </div>
+    {% endfor %}
+
+    <div class="surface assistant-skeleton" id="assistant-skeleton" hidden aria-live="polite">
+      <div class="assistant-reply-head">
+        <span class="assistant-author">
+          <span class="row-glyph">{{ icon('spark', 16) }}</span>
+          <strong>Ищу в регламентах…</strong>
+        </span>
+        <span class="state">Проверка статей</span>
+      </div>
+      <div class="skeleton-lines" aria-hidden="true">
+        <span class="sk-line sk-w85"></span>
+        <span class="sk-line sk-w95"></span>
+        <span class="sk-line sk-w60"></span>
+      </div>
+    </div>
+  </section>
+
+  <form method="post" action="{{ url_for('assistant_ask') }}" class="surface assistant-composer" data-assistant-form aria-label="Задать вопрос деканату">
+    {{ csrf_field(csrf) }}
+    <input
+      type="text"
+      name="question"
+      id="assistant-input"
+      value="{{ prefill_q }}"
+      maxlength="500"
+      placeholder="Спросите про пересдачи, академ, бюджет, 095/у, стипендию или общежитие…"
+      autocomplete="off"
+      aria-label="Текст вопроса по регламентам"
+      required
+    >
+    <button type="submit" class="btn btn-primary assistant-send-btn">
+      {{ icon('send', 16) }}<span>Спросить</span>
+    </button>
+  </form>
+</div>
+{% endblock %}

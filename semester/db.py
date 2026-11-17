@@ -102,6 +102,36 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     source TEXT NOT NULL, bucket INTEGER NOT NULL, count INTEGER NOT NULL,
     PRIMARY KEY(source, bucket)
 );
+CREATE TABLE IF NOT EXISTS assistant_messages (
+    id TEXT PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES students(id),
+    question TEXT NOT NULL,
+    answer_text TEXT NOT NULL,
+    citations_json TEXT NOT NULL DEFAULT '[]',
+    actions_json TEXT NOT NULL DEFAULT '[]',
+    mode_label TEXT NOT NULL DEFAULT '',
+    found INTEGER NOT NULL DEFAULT 1,
+    rating INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS assistant_messages_by_owner ON assistant_messages(student_id, created_at ASC);
+CREATE TABLE IF NOT EXISTS assistant_gaps (
+    id TEXT PRIMARY KEY,
+    topic TEXT NOT NULL,
+    question_sanitized TEXT NOT NULL UNIQUE,
+    hits INTEGER NOT NULL DEFAULT 1,
+    updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS assistant_rate (
+    session_key TEXT NOT NULL,
+    bucket INTEGER NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY(session_key, bucket)
+);
+CREATE TABLE IF NOT EXISTS llm_daily_usage (
+    day TEXT PRIMARY KEY,
+    tokens_used INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -211,6 +241,32 @@ def _seed_requests(db, stamp):
     )
 
 
+def _seed_gaps(db, stamp):
+    existing = {row["question_sanitized"] for row in db.execute("SELECT question_sanitized FROM assistant_gaps").fetchall()}
+    seed_rows = (
+        (
+            "gap-seed-1",
+            "Общежитие и быт",
+            "Можно ли оставить личный велосипед или электросамокат в камере хранения Студдома № 2 на зиму?",
+            4,
+            stamp - 3 * 3600,
+        ),
+        (
+            "gap-seed-2",
+            "Практика и карьера",
+            "Засчитывается ли оплачиваемая стажировка в аналитическом агентстве за учебно-ознакомительную практику 2 курса?",
+            3,
+            stamp - 9 * 3600,
+        ),
+    )
+    for gid, topic, q_text, hits, ts in seed_rows:
+        if q_text not in existing:
+            db.execute(
+                "INSERT INTO assistant_gaps VALUES (?, ?, ?, ?, ?)",
+                (gid, topic, q_text, hits, ts),
+            )
+
+
 def reset_demo_data(db):
     """Reset mutable demo records while preserving students and their password_hash values."""
     stamp = int(now().timestamp())
@@ -229,6 +285,7 @@ def reset_demo_data(db):
         "login_attempts",
         "assistant_messages",
         "assistant_gaps",
+        "assistant_rate",
     )
     with db:
         db.execute("BEGIN IMMEDIATE")
@@ -237,6 +294,7 @@ def reset_demo_data(db):
                 db.execute(f"DELETE FROM {tbl}")
         _seed_requests(db, stamp)
         _seed_charges(db, stamp)
+        _seed_gaps(db, stamp)
 
 
 def initialize(path, password_hashes):
@@ -263,5 +321,7 @@ def initialize(path, password_hashes):
                     (*STUDENTS[2], password_hashes[2]),
                 )
             _seed_charges(db, stamp)
+            if db.execute("SELECT COUNT(*) AS c FROM assistant_gaps").fetchone()["c"] == 0:
+                _seed_gaps(db, stamp)
     finally:
         db.close()

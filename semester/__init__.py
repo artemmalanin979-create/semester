@@ -1,4 +1,5 @@
 import hmac
+import json
 import os
 import re
 import secrets
@@ -11,10 +12,13 @@ from pathlib import Path
 import click
 from click import ClickException
 from flask import Flask, Response, abort, flash, g, redirect, render_template, request, session, url_for
+from markupsafe import Markup, escape
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import close_db, get_db, initialize, reset_demo_data, session_hash
+from .rag import answer_question, classify_gap_topic, sanitize_gap_question, tokenize_ru
+from .rules import CLAUSE_BY_ID, DOCUMENTS
 from .demo import (
     BOOKING_SLOTS,
     DORM_INFO,
@@ -73,6 +77,7 @@ STAFF_NAV = (
     ("staff_schedule", "calendar", "Расписание"),
     ("staff_students", "users", "Реестр студентов"),
     ("staff_notices", "bell", "Объявления"),
+    ("staff_assistant", "message", "Пробелы в базе"),
 )
 
 STAFF_MOBILE_NAV = (
@@ -80,6 +85,16 @@ STAFF_MOBILE_NAV = (
     ("staff_schedule", "calendar", "Пары"),
     ("staff_students", "users", "Студенты"),
     ("staff_notices", "bell", "Анонсы"),
+    ("staff_assistant", "message", "Вопросы"),
+)
+
+ASSISTANT_PROMPTS = (
+    "Можно ли взять академ на 2 курсе?",
+    "Как перевестись с платного на бюджет?",
+    "Сколько пересдач допускается по предмету?",
+    "Болел на зачёте — в какой срок подать 095/у?",
+    "Когда слетаешь со стипендии и как подать на ПГАС?",
+    "До какого числа платить за общагу и что при просрочке?",
 )
 
 DELIVERY = {"digital": "Электронно", "office": "В окне А–116"}
@@ -488,12 +503,16 @@ def create_app(config=None):
                 {"cat": "Деканат", "title": "Управление переносами пар", "meta": "Смена аудиторий групп МП-24-1 и МО-23-2", "url": url_for("staff_schedule"), "icon": "calendar"},
                 {"cat": "Деканат", "title": "Реестр студентов и оплат", "meta": "Рейтинги, ЗЕТ и договоры общежития", "url": url_for("staff_students"), "icon": "users"},
                 {"cat": "Деканат", "title": "Объявления потокам", "meta": "Публикация уведомлений группам", "url": url_for("staff_notices"), "icon": "bell"},
+                {"cat": "Деканат", "title": "Пробелы регламентов (ассистент)", "meta": "Обезличенные вопросы студентов без ответа в положениях", "url": url_for("staff_assistant"), "icon": "message"},
+                {"cat": "Регламенты", "title": "Сборник положений «Семестра»", "meta": "8 учебных и кампусных регламентов с пунктами", "url": url_for("rules_view"), "icon": "book"},
                 {"cat": "Профиль", "title": "Карточка сотрудника", "meta": STUDENT_PROFILES[g.student["id"]]["card_number"], "url": url_for("profile"), "icon": "user"},
             ]
         group = g.student["student_group"]
         monday = week_start(g.stamp.date())
         overrides = group_overrides(group)
         entries = [
+            {"cat": "Ассистент", "title": "Спроси деканат · ИИ по регламентам", "meta": "Ответы строго со сносками [П. X.Y]: академ, бюджет, пересдачи, 095/у, ПГАС", "url": url_for("assistant_view"), "icon": "spark"},
+            {"cat": "Регламенты", "title": "Сборник положений «Семестра»", "meta": "Все 8 регламентов обучения, стипендий, общежития и воинского учёта", "url": url_for("rules_view"), "icon": "book"},
             {"cat": "Навигатор", "title": "Умный навигатор деканата", "meta": "Разбор жизненных ситуаций: военкомат, болезнь, общага, ПГАС", "url": url_for("navigator"), "icon": "compass"},
             {"cat": "Разделы", "title": "Финансы, стипендия и общежитие", "meta": "Оплата договора СБП, квитанции, гостевой QR и коворкинг", "url": url_for("campus"), "icon": "wallet"},
             {"cat": "Разделы", "title": "Расписание недели", "meta": f"Группа {group}", "url": url_for("schedule", view="week"), "icon": "calendar"},
@@ -534,6 +553,7 @@ def create_app(config=None):
         unread_count = sum(item["unread"] for item in my_notices()) if (signed and not staff) else 0
         unpaid_count = 0
         pending_staff = 0
+        gaps_staff = 0
         if signed and not staff:
             unpaid_count = get_db().execute(
                 "SELECT COUNT(*) AS c FROM charges WHERE student_id = ? AND status = 'unpaid'",
@@ -544,6 +564,7 @@ def create_app(config=None):
                 "SELECT COUNT(*) AS c FROM requests WHERE ready_at > ? AND decision NOT IN ('returned', 'rejected')",
                 (g.epoch,),
             ).fetchone()["c"]
+            gaps_staff = get_db().execute("SELECT COUNT(*) AS c FROM assistant_gaps").fetchone()["c"]
         student_meta = STUDENT_PROFILES[g.student["id"]] if signed else None
         pass_qr = (
             qr_svg_path(public_url("verify_pass", pass_token=pass_token_for(g.student["id"])))
@@ -556,7 +577,9 @@ def create_app(config=None):
             mobile_nav=STAFF_MOBILE_NAV if staff else STUDENT_MOBILE_NAV,
             is_staff=staff,
             pending_staff=pending_staff,
+            gaps_staff=gaps_staff,
             unpaid_count=unpaid_count,
+            assistant_prompts=ASSISTANT_PROMPTS,
             home_endpoint="staff_dashboard" if staff else "home",
             csrf=csrf,
             fmt_date=fmt_date,
@@ -716,6 +739,272 @@ def create_app(config=None):
             all_situations=all_situations,
             instant_nonce=secrets.token_hex(16),
         )
+
+    def _student_rag_context():
+        sid = g.student["id"]
+        snap = rating_snapshot(sid)
+        charges = owned_charges(sid)
+        dorm = DORM_INFO[sid]
+        scholar = SCHOLARSHIPS[sid]
+        profile = STUDENT_PROFILES[sid]
+        unpaid_dorm = next((c for c in charges if c["status"] == "unpaid" and c["category"] == "Общежитие"), None)
+        nxt = snap["upcoming"][0] if snap["upcoming"] else None
+        other_markers = (
+            ("миш", "михаил", "ратников", "орлов", "misha@")
+            if sid == 1
+            else ("валер", "маяков", "орлов", "lera@")
+        )
+        return {
+            "course": g.student["course"],
+            "program": g.student["program"],
+            "group": g.student["student_group"],
+            "funding": profile["funding"],
+            "rating_avg": snap["rating_avg"],
+            "earned_credits": snap["earned_credits"],
+            "total_credits": snap["total_credits"],
+            "next_exam": (
+                {"title": nxt["title"], "date": fmt_date(nxt["date"]), "score": nxt["score"]}
+                if nxt else None
+            ),
+            "unpaid_rub": sum(c["amount"] for c in charges if c["status"] == "unpaid"),
+            "scholar_monthly": fmt_rub(scholar["total_monthly"]),
+            "scholar_next": scholar["next_date"],
+            "dorm_building": dorm["building"],
+            "unpaid_dorm_rub": fmt_rub(unpaid_dorm["amount"]) if unpaid_dorm else "",
+            "unpaid_dorm_due": unpaid_dorm["due_label"] if unpaid_dorm else "",
+            "other_student_markers": other_markers,
+        }
+
+    def _render_cited_paragraphs(answer_text):
+        paragraphs = []
+        for raw_part in (answer_text or "").split("\n\n"):
+            part = raw_part.strip()
+            if not part:
+                continue
+            safe_str = str(escape(part))
+
+            def _cite_link(match):
+                cid = match.group(1)
+                clause = CLAUSE_BY_ID.get(cid)
+                if not clause:
+                    return match.group(0)
+                href = escape(clause["url"])
+                title_attr = escape(f"{clause['doc_title']} — {clause['title']}")
+                return f'<a class="cite-inline" href="{href}" title="{title_attr}">[П. {escape(cid)}]</a>'
+
+            linked = re.sub(r"\[П\.\s*(\d+\.\d+)\]", _cite_link, safe_str)
+            paragraphs.append(Markup(linked))
+        return paragraphs
+
+    def _load_assistant_state(db, student_id):
+        rows = db.execute(
+            "SELECT * FROM assistant_messages WHERE student_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 40",
+            (student_id,),
+        ).fetchall()
+        messages = []
+        for row in rows:
+            item = dict(row)
+            item["citations"] = json.loads(item["citations_json"] or "[]")
+            item["actions"] = json.loads(item["actions_json"] or "[]")
+            item["paragraphs"] = _render_cited_paragraphs(item["answer_text"])
+            item["time_label"] = fmt_dt(item["created_at"])
+            messages.append(item)
+        try:
+            daily_budget = int(os.environ.get("SEMESTER_LLM_DAILY_TOKENS", "60000"))
+        except ValueError:
+            daily_budget = 60000
+        day_key = g.stamp.date().isoformat()
+        usage_row = db.execute("SELECT tokens_used FROM llm_daily_usage WHERE day = ?", (day_key,)).fetchone()
+        used_today = usage_row["tokens_used"] if usage_row else 0
+        budget_allows = daily_budget > 0 and used_today < daily_budget
+        llm_mode = os.environ.get("SEMESTER_LLM", "off").strip().lower()
+        has_gigachat = bool(llm_mode == "gigachat" and os.environ.get("GIGACHAT_AUTH_KEY", "").strip() and budget_allows)
+        return messages, has_gigachat, budget_allows
+
+    @app.get("/rules")
+    def rules_view():
+        query = request.args.get("q", "").strip()[:140]
+        q_stems = set(tokenize_ru(query, expand=True)) if query else set()
+        filtered_docs = []
+        matched_clauses = 0
+        for doc in DOCUMENTS:
+            if not q_stems:
+                clauses = [
+                    {**cl, "anchor": f"p-{cl['id'].replace('.', '-')}"}
+                    for cl in doc["clauses"]
+                ]
+            else:
+                clauses = []
+                for cl in doc["clauses"]:
+                    haystack = f"{doc['title']} {cl['id']} {cl['title']} {cl['keywords']} {cl['text']}"
+                    cl_stems = set(tokenize_ru(haystack, expand=False))
+                    if q_stems & cl_stems or query.lower() in haystack.lower():
+                        clauses.append({**cl, "anchor": f"p-{cl['id'].replace('.', '-')}"})
+            if clauses:
+                matched_clauses += len(clauses)
+                filtered_docs.append({**doc, "clauses": clauses})
+        return render_template(
+            "rules.html",
+            active="staff_assistant" if is_staff() else "home",
+            documents=filtered_docs,
+            total_docs=len(DOCUMENTS),
+            matched_clauses=matched_clauses,
+            query=query,
+        )
+
+    @app.get("/assistant")
+    def assistant_view():
+        guard = require_student()
+        if guard:
+            return guard
+        prefill_q = request.args.get("q", "").strip()[:500]
+        messages, has_gigachat, _ = _load_assistant_state(get_db(), g.student["id"])
+        return render_template(
+            "assistant.html",
+            active="home",
+            messages=messages,
+            prefill_q=prefill_q,
+            prompts=ASSISTANT_PROMPTS,
+            has_gigachat=has_gigachat,
+            error=None,
+        )
+
+    @app.post("/assistant/ask")
+    def assistant_ask():
+        guard = require_student()
+        if guard:
+            return guard
+        db = get_db()
+        raw_question = request.form.get("question", "").strip()
+        if len(raw_question) > 500:
+            messages, has_gigachat, _ = _load_assistant_state(db, g.student["id"])
+            return (
+                render_template(
+                    "assistant.html",
+                    active="home",
+                    messages=messages,
+                    prefill_q=raw_question[:500],
+                    prompts=ASSISTANT_PROMPTS,
+                    has_gigachat=has_gigachat,
+                    error="Длина вопроса не должна превышать 500 символов.",
+                ),
+                422,
+            )
+        if len(raw_question) < 2:
+            flash("Введите вопрос по учебным регламентам или кампусу.")
+            return redirect(url_for("assistant_view"), code=303)
+
+        sid = g.student["id"]
+        client_ip = request.remote_addr or "local"
+        now_ts = int(time.time())
+        min_bucket = now_ts // 60
+        day_bucket = now_ts // 86400
+        limits = (
+            (f"m:stu:{sid}", min_bucket, 10),
+            (f"d:stu:{sid}", day_bucket, 60),
+            (f"m:ip:{client_ip}", min_bucket, 20),
+            (f"d:ip:{client_ip}", day_bucket, 120),
+        )
+        with db:
+            db.execute(
+                "DELETE FROM assistant_rate WHERE (session_key LIKE 'm:%' AND bucket < ?) OR (session_key LIKE 'd:%' AND bucket < ?)",
+                (min_bucket - 2, day_bucket - 2),
+            )
+            for rkey, rbucket, cap in limits:
+                used = db.execute(
+                    "SELECT COALESCE(SUM(count), 0) AS c FROM assistant_rate WHERE session_key = ? AND bucket = ?",
+                    (rkey, rbucket),
+                ).fetchone()["c"]
+                if used >= cap:
+                    abort(429)
+            for rkey, rbucket, _ in limits:
+                db.execute(
+                    """INSERT INTO assistant_rate VALUES (?, ?, 1)
+                       ON CONFLICT(session_key, bucket) DO UPDATE SET count = count + 1""",
+                    (rkey, rbucket),
+                )
+
+        messages, _, budget_allows_llm = _load_assistant_state(db, sid)
+        history_turns = []
+        for prev in messages[-3:]:
+            history_turns.append({"role": "user", "content": prev["question"]})
+            history_turns.append({"role": "assistant", "content": prev["answer_text"]})
+
+        result = answer_question(
+            raw_question,
+            _student_rag_context(),
+            history=history_turns,
+            budget_allows_llm=budget_allows_llm,
+        )
+        msg_id = secrets.token_hex(12)
+        day_key = g.stamp.date().isoformat()
+        with db:
+            if result.get("tokens_used", 0) > 0:
+                db.execute(
+                    """INSERT INTO llm_daily_usage VALUES (?, ?)
+                       ON CONFLICT(day) DO UPDATE SET tokens_used = tokens_used + excluded.tokens_used""",
+                    (day_key, int(result["tokens_used"])),
+                )
+            db.execute(
+                """INSERT INTO assistant_messages
+                   (id, student_id, question, answer_text, citations_json, actions_json, mode_label, found, rating, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                (
+                    msg_id,
+                    sid,
+                    raw_question,
+                    result["answer_text"],
+                    json.dumps(result["citations"], ensure_ascii=False),
+                    json.dumps(result["actions"], ensure_ascii=False),
+                    result["mode_label"],
+                    1 if result["found"] else 0,
+                    g.epoch,
+                ),
+            )
+            if not result["found"] and not result.get("is_attack"):
+                clean_gap = sanitize_gap_question(raw_question)
+                if len(clean_gap) >= 4:
+                    topic = classify_gap_topic(raw_question)
+                    db.execute(
+                        """INSERT INTO assistant_gaps VALUES (?, ?, ?, 1, ?)
+                           ON CONFLICT(question_sanitized)
+                           DO UPDATE SET hits = hits + 1, updated_at = excluded.updated_at""",
+                        (secrets.token_hex(10), topic, clean_gap, g.epoch),
+                    )
+        return redirect(url_for("assistant_view") + f"#msg-{msg_id}", code=303)
+
+    @app.post("/assistant/feedback/<msg_id>")
+    def assistant_feedback(msg_id):
+        guard = require_student()
+        if guard:
+            return guard
+        if not re.fullmatch(r"[0-9a-f]{16,32}", msg_id):
+            abort(404)
+        raw_rating = request.form.get("rating", "")
+        if raw_rating not in {"1", "-1"}:
+            abort(400)
+        rating_val = int(raw_rating)
+        db = get_db()
+        with db:
+            cur = db.execute(
+                "UPDATE assistant_messages SET rating = ? WHERE id = ? AND student_id = ?",
+                (rating_val, msg_id, g.student["id"]),
+            )
+        if cur.rowcount == 0:
+            abort(404)
+        flash("Спасибо! Оценка ответа учтена.")
+        return redirect(url_for("assistant_view") + f"#msg-{msg_id}", code=303)
+
+    @app.post("/assistant/clear")
+    def assistant_clear():
+        guard = require_student()
+        if guard:
+            return guard
+        db = get_db()
+        with db:
+            db.execute("DELETE FROM assistant_messages WHERE student_id = ?", (g.student["id"],))
+        flash("Начат новый диалог.")
+        return redirect(url_for("assistant_view"), code=303)
 
     @app.get("/schedule")
     def schedule():
@@ -1474,11 +1763,13 @@ def create_app(config=None):
         closed_total = len(all_reqs) - pending_total
         unpaid_total = db.execute("SELECT COUNT(*) AS c FROM charges WHERE status = 'unpaid'").fetchone()["c"]
         overrides_total = db.execute("SELECT COUNT(*) AS c FROM room_overrides").fetchone()["c"]
+        gaps_total = db.execute("SELECT COUNT(*) AS c FROM assistant_gaps").fetchone()["c"]
         return {
             "pending_total": pending_total,
             "closed_total": closed_total,
             "unpaid_total": unpaid_total,
             "overrides_total": overrides_total,
+            "gaps_total": gaps_total,
         }
 
     @app.get("/staff")
@@ -1676,15 +1967,50 @@ def create_app(config=None):
         published = db.execute(
             "SELECT * FROM staff_notices ORDER BY created_at DESC LIMIT 20"
         ).fetchall()
+        prefill_title = request.args.get("title", "").strip()[:120]
+        prefill_body = request.args.get("body", "").strip()[:400]
         stats = _staff_metrics(db)
         return render_template(
             "staff.html",
             active="staff_notices",
             tab="notices",
             published=published,
+            prefill_title=prefill_title,
+            prefill_body=prefill_body,
             groups=GROUPS,
             **stats,
         )
+
+    @app.get("/staff/assistant")
+    def staff_assistant():
+        require_staff()
+        db = get_db()
+        gaps = [
+            dict(r)
+            for r in db.execute(
+                "SELECT * FROM assistant_gaps ORDER BY hits DESC, updated_at DESC LIMIT 30"
+            ).fetchall()
+        ]
+        stats = _staff_metrics(db)
+        return render_template(
+            "staff.html",
+            active="staff_assistant",
+            tab="assistant",
+            gaps=gaps,
+            groups=GROUPS,
+            **stats,
+        )
+
+    @app.post("/staff/assistant/<gap_id>/dismiss")
+    def staff_dismiss_gap(gap_id):
+        require_staff()
+        db = get_db()
+        with db:
+            cur = db.execute("DELETE FROM assistant_gaps WHERE id = ?", (gap_id,))
+        if cur.rowcount == 0:
+            abort(404)
+        flash("Тема отмечена закрытой и убрана из списка пробелов.")
+        return redirect(url_for("staff_assistant"), code=303)
 
     @app.post("/staff/requests/<request_id>/resolve")
     def staff_resolve_request(request_id):
