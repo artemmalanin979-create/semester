@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, csrf_field, pageheading, state_badge %}
+{% from 'components.html' import subnav, icon, csrf_field, pageheading, state_badge %}
 {% block title %}Успеваемость · Семестр{% endblock %}
 {% block content %}
-{% call pageheading('Успеваемость', 'Осенний семестр · группа ' ~ g.student.student_group ~ ' · 100-балльная рейтинговая шкала') %}
+{% call pageheading('Учёба', 'Осенний семестр · группа ' ~ g.student.student_group ~ ' · 100-балльная рейтинговая шкала') %}
   <a class="btn btn-ghost compact" href="{{ url_for('request_new', kind='retake') }}">
     {{ icon('refresh', 15) }}<span>Пересдача / бегунок</span>
   </a>
@@ -14,6 +14,7 @@
     </button>
   </form>
 {% endcall %}
+{{ subnav('Подразделы учёбы', [(url_for('schedule'), 'Расписание', false), (url_for('grades'), 'Успеваемость', true)]) }}
 
 <section class="surface metrics-bar" aria-label="Сводка семестра">
   <div class="metric-cell">

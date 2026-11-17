@@ -1,7 +1,6 @@
 """Invented, repeatable demo data. Dates follow the academic week in Moscow."""
 from datetime import date, datetime, time, timedelta
 from hashlib import sha256
-import re
 from zoneinfo import ZoneInfo
 
 import segno
@@ -13,9 +12,9 @@ SHORT_DAY = "Пн Вт Ср Чт Пт Сб Вс".split()
 
 STUDENTS = (
     (1, "lera@demo.example", "Валерия Маякова", "Валерия Ильинична Маякова",
-     "Институт маркетинга и предпринимательства", "Маркетинг и управление продуктом", 2, "МП-24-1", "student"),
+     "Институт маркетинга и предпринимательства", "Маркетинг и управление продуктом", 3, "МП-24-1", "student"),
     (2, "misha@demo.example", "Михаил Ратников", "Михаил Егорович Ратников",
-     "Факультет международных отношений", "Международные отношения", 3, "МО-23-2", "student"),
+     "Факультет международных отношений", "Международные отношения", 4, "МО-23-2", "student"),
     (3, "dean@demo.example", "Елена Орлова", "Елена Викторовна Орлова",
      "Учебный офис деканата", "Ведущий методист · окно А–116", 0, "А–116", "staff"),
 )
@@ -29,8 +28,14 @@ STUDENT_PROFILES = {
         "advisor": "Е. В. Ларионова · каб. А–118",
         "pass_zone": "Корпуса А, Б, В · Студдом № 2 · Читальный зал",
         "pass_valid": "31 августа 2027",
-        "order_no": "№ 418-ст от 26.08.2025",
+        "order_no": "№ 418-ст от 26.08.2024",
         "program_code": "38.03.02 Менеджмент",
+        "admission_year": 2024,
+        "study_end": "31 августа 2028",
+        "gender": "f",
+        "funding_basis": "budget",
+        "lives_in_dorm": True,
+        "military_registered": False,
     },
     2: {
         "card_number": "23-МО-0412",
@@ -40,8 +45,14 @@ STUDENT_PROFILES = {
         "advisor": "Д. А. Корсаков · каб. В–204",
         "pass_zone": "Корпуса А, Б, В · Студдом № 1 · Дипломатический зал",
         "pass_valid": "31 августа 2027",
-        "order_no": "№ 392-ст от 25.08.2024",
+        "order_no": "№ 392-ст от 25.08.2023",
         "program_code": "41.03.05 Международные отношения",
+        "admission_year": 2023,
+        "study_end": "31 августа 2027",
+        "gender": "m",
+        "funding_basis": "budget",
+        "lives_in_dorm": True,
+        "military_registered": True,
     },
     3: {
         "card_number": "ST-А116-09",
@@ -53,6 +64,12 @@ STUDENT_PROFILES = {
         "pass_valid": "31 августа 2027",
         "order_no": "Штатный реестр",
         "program_code": "Учебный офис",
+        "admission_year": 0,
+        "study_end": "",
+        "gender": "f",
+        "funding_basis": "staff",
+        "lives_in_dorm": False,
+        "military_registered": False,
     },
 }
 
@@ -126,7 +143,16 @@ STUDY_SPACES = (
     ("box-k1", "Проектный бокс К–1", "Читальный зал, Корпус А, 2 этаж · 4 места · экран USB-C"),
     ("box-k2", "Переговорная К–2", "Корпус А, 2 этаж · 6 мест · маркерная стена"),
     ("media-m1", "Медиастудия М–1", "Корпус Б, 2 этаж · запись презентаций и звонков"),
+    ("cw-gallery", "Коворкинг «Галерея», стол на 4", "Тёплая галерея между корпусами А и Б · розетки у каждого места"),
 )
+
+# Переговорные (закрытые комнаты под встречи) и коворкинг (открытые рабочие места) — разные подвкладки
+SPACE_KIND = {
+    "box-k2": "rooms",
+    "media-m1": "rooms",
+    "box-k1": "cowork",
+    "cw-gallery": "cowork",
+}
 
 BOOKING_SLOTS = ("11:35–13:00", "13:35–15:00", "16:00–17:30", "17:30–19:00")
 OFFICE_SLOT_TIMES = ("11:40", "13:40", "15:50", "16:20")
@@ -273,6 +299,28 @@ PETITION_TYPES = {
 }
 
 REQUEST_TYPES = {**INSTANT_TYPES, **PETITION_TYPES}
+
+
+def eligibility(student_id):
+    """Profile rules: which services make sense for this student (no guesses from chat)."""
+    meta = STUDENT_PROFILES.get(student_id, {})
+    is_student = meta.get("funding_basis") in {"budget", "contract"}
+    military = bool(is_student and meta.get("gender") == "m" and meta.get("military_registered"))
+    scholarship = bool(is_student and meta.get("funding_basis") == "budget" and student_id in SCHOLARSHIPS)
+    dorm = bool(is_student and meta.get("lives_in_dorm") and student_id in DORM_INFO)
+    return {"military": military, "scholarship": scholarship, "dorm": dorm}
+
+
+# Instant certificate kind -> eligibility flag that must be true (None = available to every student)
+INSTANT_RULES = {"study": None, "grades": None, "military": "military", "income": "scholarship", "dorm_cert": "dorm"}
+
+
+def instant_types_for(student_id):
+    rules = eligibility(student_id)
+    return {
+        kind: spec for kind, spec in INSTANT_TYPES.items()
+        if INSTANT_RULES[kind] is None or rules[INSTANT_RULES[kind]]
+    }
 
 STAFF_PRESETS = (
     "Согласовано учебным офисом. Изменения отражены в карточке студента.",
@@ -455,6 +503,15 @@ def academic_results(student, day):
     ]
 
 
+_CERT_SHORT = {
+    "study": "об обучении",
+    "military": "в военкомат, Прил. № 4",
+    "income": "о стипендии",
+    "grades": "выписка оценок",
+    "dorm_cert": "о проживании",
+}
+
+
 def notices(student, stamp, overrides=None):
     current = stamp.date()
     group = student["student_group"]
@@ -502,246 +559,15 @@ def notices(student, stamp, overrides=None):
             "kind": "Деканат",
             "title": "Мгновенные справки и запись в окно А–116",
             "body": (
-                "Типовые справки (обучение, военкомат Прил. № 4, доходы, проживание) выпускаются онлайн за 1 секунду. "
+                f"Типовые справки ({', '.join(_CERT_SHORT[k] for k in instant_types_for(student['id']))}) выпускаются онлайн за 1 секунду. "
                 "Для бумажных оригиналов доступна запись по слотам."
             ),
             "date": current,
             "icon": "file",
-            "link": "/requests",
+            "link": "/requests?tab=order",
             "action": "К документам",
         },
     ]
-
-
-def build_navigator_situations(student, snap, charges, dorm, scholar):
-    """Build personalized situation playbooks for the signed-in student."""
-    sid = student["id"]
-    unpaid_dorm = next((c for c in charges if c["category"] == "Общежитие" and c["status"] == "unpaid"), None)
-    paid_dorm = next((c for c in charges if c["category"] == "Общежитие" and c["status"] == "paid"), None)
-    next_exam = snap["upcoming"][0] if snap["upcoming"] else None
-    exam_text = (
-        f"{next_exam['title']} ({fmt_date(next_exam['date'])}, {next_exam['exam_room']})"
-        if next_exam else "все аттестации семестра закрыты"
-    )
-
-    room_code = dorm["room"].split()[0]
-    if unpaid_dorm:
-        dorm_summary = (
-            f"По вашему договору {dorm['contract']} ({dorm['building']}, комн. {room_code}) "
-            f"к оплате {fmt_rub(unpaid_dorm['amount'])} ({unpaid_dorm['due_label']})."
-        )
-        dorm_action_label = f"Перейти к оплате {fmt_rub(unpaid_dorm['amount'])}"
-        dorm_action_url = "/campus#billing-section"
-    else:
-        dorm_summary = (
-            f"Договор {dorm['contract']} ({dorm['building']}, комн. {room_code}) полностью оплачен — "
-            "задолженностей нет, пропуск в общежитие активен."
-        )
-        dorm_action_label = "Открыть квитанцию и договоры"
-        dorm_action_url = f"/campus/receipt/{paid_dorm['id']}" if paid_dorm else "/campus"
-
-    pgas_ok = snap["rating_int"] >= 85
-    pgas_note = (
-        f"Ваш текущий рейтинг {snap['rating_avg']}/100 выше конкурсного порога (85 баллов) — вы проходите на конкурс ПГАС."
-        if pgas_ok
-        else f"Ваш текущий рейтинг {snap['rating_avg']}/100 (порог учебной номинации ПГАС — 85 баллов, доступны научная и общественная номинации)."
-    )
-
-    return [
-        {
-            "slug": "dorm-pay",
-            "keywords": "общага общежитие студдом проживание найма квартплата оплатить договор квитанция сбп",
-            "triggers": ("общаг", "общежит", "студдом", "проживан", "найм", "квартплат", "квитанц"),
-            "question": "Оплатить общежитие и получить квитанцию",
-            "badge": fmt_rub(unpaid_dorm["amount"]) if unpaid_dorm else "Оплачено",
-            "badge_tone": "warn" if unpaid_dorm else "ok",
-            "summary": dorm_summary,
-            "steps": (
-                "Откройте карточку начисления в разделе «Финансы и кампус» — реквизиты договора подставлены автоматически.",
-                "Выберите СБП (комиссия 0 %) или карту «Мир» и подтвердите платёж в один клик.",
-                "Электронная квитанция с QR-кодом сразу сохранится в реестре и не требует похода к коменданту.",
-            ),
-            "action_label": dorm_action_label,
-            "action_url": dorm_action_url,
-            "instant_kind": None,
-        },
-        {
-            "slug": "military",
-            "keywords": "военкомат отсрочка призыв приложение воинский учет армия повестка",
-            "triggers": ("военком", "отсрочк", "призыв", "воинск", "арми", "повестк", "приложени"),
-            "question": "Нужна справка в военкомат для отсрочки",
-            "badge": "За 1 сек",
-            "badge_tone": "ok",
-            "summary": (
-                f"Для отсрочки очной формы ({student['course']} курс, приказ {STUDENT_PROFILES[sid]['order_no']}) "
-                "оформляется справка по Приложению № 4."
-            ),
-            "steps": (
-                "Выпустите электронную справку Приложение № 4 с кодом реестра прямо сейчас кнопкой ниже.",
-                "Если военкомат требует гербовую печать — запишитесь на слот в окно А–116 без живой очереди.",
-                "Возьмите с собой паспорт и удостоверение гражданина, подлежащего призыву.",
-            ),
-            "action_label": "Выпустить Приложение № 4",
-            "action_url": "/requests",
-            "instant_kind": "military",
-        },
-        {
-            "slug": "illness",
-            "keywords": "заболел болезнь болел медсправка 095 врач больничный температура поликлиника",
-            "triggers": ("заболел", "болезн", "болел", "медсправ", "095", "врач", "больничн", "температур", "поликлиник"),
-            "question": "Заболел перед зачётом или экзаменом",
-            "badge": "Регламент 5 дней",
-            "badge_tone": "",
-            "summary": (
-                f"Ближайшая сдача в вашем плане: {exam_text}. "
-                "Медицинская справка 095/у закрывает пропуски и даёт право на резервный день без потери баллов."
-            ),
-            "steps": (
-                "В течение 5 учебных дней после закрытия больничного подайте заявление «Медсправка 095/у» онлайн.",
-                "Укажите даты освобождения и номер поликлиники — методист снимет отметки пропусков в ведомости.",
-                "Если болезнь совпала с зачётом или экзаменом, резервная дата появится в уведомлениях автоматически.",
-            ),
-            "action_label": "Подать 095/у в 1 клик",
-            "action_url": "/requests/new/medical?prefill=medical",
-            "instant_kind": None,
-        },
-        {
-            "slug": "missed-class",
-            "keywords": "пропустил пару пропуск пары опоздал отработка объяснительная посещаемость прогул",
-            "triggers": ("пропустил", "опоздал", "отработк", "объяснительн", "посещаем", "прогул"),
-            "question": "Пропустил пару — что делать",
-            "badge": f"Группа {student['student_group']}",
-            "badge_tone": "",
-            "summary": (
-                f"Разовый пропуск семинара не снижает допуск (сейчас ваш средний рейтинг {snap['rating_avg']}/100), "
-                "но при уважительной причине отметку лучше закрыть через учебный офис."
-            ),
-            "steps": (
-                "При болезни оформите форму 095/у; при олимпиаде, кейс-чемпионате или вызове приложите реквизиты письма.",
-                "Отправьте предзаполненное заявление куратору потока в один клик — бумажная объяснительная не нужна.",
-                "Согласуйте тему отработки с преподавателем на ближайшем семинаре или в проектном боксе.",
-            ),
-            "action_label": "Подать заявление в 1 клик",
-            "action_url": "/requests/new/appeal?prefill=missed",
-            "instant_kind": None,
-        },
-        {
-            "slug": "scholarship",
-            "keywords": "стипендия пгас выплата доход матпомощь повышенная материальная помощь",
-            "triggers": ("стипенд", "пгас", "выплат", "доход", "матпомощ", "повышенн"),
-            "question": "Хочу повышенную стипендию (ПГАС) или справку о доходах",
-            "badge": fmt_rub(scholar["total_monthly"]) + "/мес",
-            "badge_tone": "ok",
-            "summary": (
-                f"Назначено {fmt_rub(scholar['total_monthly'])} в месяц на карту {scholar['card_mask']} "
-                f"(ближайшее зачисление — {scholar['next_date']}). {pgas_note}"
-            ),
-            "steps": (
-                "Для соцзащиты, визы или банка выпустите помесячную справку о выплатах за 6 месяцев в один клик.",
-                "Для участия в конкурсе ПГАС или получения матпомощи отправьте предзаполненную заявку с достижениями.",
-                "Решение стипендиальной комиссии отобразится в разделе «Уведомления».",
-            ),
-            "action_label": "Подать на ПГАС в 1 клик",
-            "action_url": "/requests/new/pgas?prefill=pgas",
-            "instant_kind": "income",
-            "instant_label": "Справка о доходах",
-        },
-        {
-            "slug": "guest-cowork",
-            "keywords": "гость гостевой родители пропуск коворкинг переговорная бокс забронировать",
-            "triggers": ("гост", "родител", "коворкинг", "переговорн", "бокс", "медиастуд"),
-            "question": "Привести гостя в кампус или занять переговорную",
-            "badge": "Онлайн-пропуск",
-            "badge_tone": "",
-            "summary": (
-                f"Разовый гостевой QR действует с 09:00 до 22:00 ({dorm['building']} и учебные корпуса А/Б), "
-                "а проектные боксы бронируются под окна между парами."
-            ),
-            "steps": (
-                "Укажите ФИО гостя, дату и корпус — гостевой QR-код сформируется мгновенно.",
-                "На проходной гостю достаточно показать QR с экрана и предъявить паспорт.",
-                "Для командной работы между парами выберите свободный бокс К–1, К–2 или медиастудию М–1.",
-            ),
-            "action_label": "Оформить гостевой QR или бокс",
-            "action_url": "/campus#campus-pass-section",
-            "instant_kind": None,
-        },
-        {
-            "slug": "curriculum",
-            "keywords": "факультатив второй язык пересдача бегунок иуп перезачет электив",
-            "triggers": ("факультатив", "пересдач", "бегунок", "иуп", "перезачет", "электив", "второй язык"),
-            "question": "Сменить факультатив, второй язык или взять бегунок",
-            "badge": f"Группа {student['student_group']}",
-            "badge_tone": "",
-            "summary": (
-                f"Куратор направления: {STUDENT_PROFILES[sid]['advisor']}. "
-                "Изменения индивидуального плана и направления на пересдачу оформляются без бумажных обходных листов."
-            ),
-            "steps": (
-                "Выберите «Направление на пересдачу» или «Заявление в учебный офис» и укажите дисциплину.",
-                "Методист окна А–116 проверит академическую разницу и пришлёт ответ прямо в карточку заявки.",
-                "После согласования обновлённая дисциплина отразится в вашей зачётной ведомости.",
-            ),
-            "action_label": "Подать заявление в 1 клик",
-            "action_url": "/requests/new/appeal?prefill=curriculum",
-            "instant_kind": None,
-        },
-    ]
-
-
-_NAV_STOPWORDS = frozenset({
-    "как", "что", "где", "когда", "или", "для", "при", "под", "над", "про",
-    "без", "мне", "мой", "моя", "мои", "хочу", "нужно", "надо", "можно",
-    "если", "есть", "нет", "это", "все", "его", "она", "они", "делать",
-    "взять", "получить", "подать", "будет", "курс", "курсе", "деканат",
-})
-
-# Queries that require full regulations / individual review rather than the 7 express cards
-_NAV_OUT_OF_PLAYBOOK = (
-    "академ",
-    "бюджет",
-    "отчислен",
-    "восстановлен",
-    "другой вуз",
-    "смена программ",
-    "перевод на",
-    "перевестись",
-)
-
-
-def match_navigator_query(query, situations):
-    raw = (query or "").strip().lower().replace("ё", "е")
-    if not raw:
-        return situations
-    # Exact question match (e.g. clicking a shortcut link on Home)
-    for item in situations:
-        if raw == item["question"].strip().lower().replace("ё", "е"):
-            return [item]
-    # Explicit out-of-playbook regulatory questions must not produce confident false positives
-    if any(marker in raw for marker in _NAV_OUT_OF_PLAYBOOK):
-        return []
-    tokens = [
-        tok for tok in re.findall(r"[а-яa-z0-9]+", raw)
-        if (len(tok) >= 3 or tok in {"qr", "095"}) and tok not in _NAV_STOPWORDS
-    ]
-    if not tokens:
-        return []
-    scored = []
-    for item in situations:
-        triggers = item.get("triggers", ())
-        score = 0
-        for trig in triggers:
-            if " " in trig:
-                if trig in raw:
-                    score += 5
-            elif any(tok.startswith(trig) or trig.startswith(tok[:5]) and len(tok) >= 5 for tok in tokens):
-                score += 4
-        if score >= 4:
-            scored.append((score, item))
-    if not scored:
-        return []
-    scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [item for _, item in scored]
 
 
 def qr_svg_path(payload_text):

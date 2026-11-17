@@ -111,6 +111,64 @@ _FOLLOWUP_HINTS = frozenset({
 
 _GIGACHAT_TOKEN_CACHE = {"token": "", "expires_at": 0.0}
 
+# Сервисные намерения чата: быстрые кнопки и типовые формулировки ведут прямо в нужную форму (deep link).
+# Ассистент ничего не делает сам — только открывает раздел/подвкладку; ответ по-прежнему цитирует пункты.
+SERVICE_INTENTS = (
+    {
+        "slug": "certificate",
+        "pattern": re.compile(r"(?:заказ\w*|оформ\w*|выпуст\w*|получ\w*|нуж\w*|сдела\w*)\s+(?:\w+\s+)?справк|^\s*справк\w*\s*(?:об обучении)?\s*\??$|справк\w* об обучени|с места учеб", re.I),
+        "clauses": ("8.10", "1.9"),
+        "action": ("Открыть «Заказать справку»", "/requests?tab=order"),
+        "requires": None,
+    },
+    {
+        "slug": "dorm-pay",
+        "pattern": re.compile(r"(?:оплат\w*|заплат\w*|плат[её]ж\w*|квитанц\w*)\s+(?:за\s+)?(?:\w+\s+)?(?:общаг|общежит|проживан|студдом)", re.I),
+        "clauses": ("6.1", "6.4"),
+        "action": ("Перейти к оплате общежития", "/finance?tab=dorm"),
+        "requires": "dorm",
+    },
+    {
+        "slug": "scholarship-date",
+        "pattern": re.compile(r"когда\s+(?:придет|придёт|будет|приходит|платят|зачисл\w*|выплат\w*)?\s*стипенд|стипенди\w*\s+когда|дата\s+(?:выплаты\s+)?стипенд", re.I),
+        "clauses": ("5.7", "5.1"),
+        "action": ("Открыть «Стипендия и выплаты»", "/finance?tab=scholarship"),
+        "requires": "scholarship",
+    },
+    {
+        "slug": "meeting-room",
+        "pattern": re.compile(r"переговор\w*|медиастуди\w*", re.I),
+        "clauses": ("8.8",),
+        "action": ("Забронировать переговорную", "/spaces?tab=rooms"),
+        "requires": None,
+    },
+    {
+        "slug": "cowork",
+        "pattern": re.compile(r"коворкинг\w*|рабоч\w+\s+мест|проектн\w+\s+бокс", re.I),
+        "clauses": ("8.11",),
+        "action": ("Открыть коворкинг", "/spaces?tab=cowork"),
+        "requires": None,
+    },
+    {
+        "slug": "guest-pass",
+        "pattern": re.compile(r"гост\w*\s*(?:пропуск|qr)|пропуск\w*\s+(?:для\s+)?(?:гост|родител|друг)|привести\s+(?:гост|родител|друг)", re.I),
+        "clauses": ("6.5",),
+        "action": ("Оформить гостевой пропуск", "/dorm?tab=guest"),
+        "requires": "dorm",
+    },
+)
+
+
+_MILITARY_TOPIC_RE = re.compile(r"военк|воинск|призыв|отсрочк|арми|повестк|приложени\w*\s*(?:№\s*)?4|вус")
+
+
+def detect_service_intent(text: str):
+    norm = _normalize_text(text)
+    for intent in SERVICE_INTENTS:
+        if intent["pattern"].search(norm):
+            return intent
+    return None
+
 
 def _normalize_text(text: str) -> str:
     return (text or "").lower().replace("ё", "е")
@@ -317,11 +375,24 @@ def _personal_context_line(student_ctx: dict, doc_slug: str, primary_id: str) ->
     if doc_slug == "budget-transfer":
         debt_str = "есть открытые начисления по договорам" if student_ctx["unpaid_rub"] > 0 else "просроченных долгов за прошлые периоды нет"
         return f"С учётом вашего профиля ({course} курс, {funding.lower()}, рейтинг {rating}/100): {debt_str} [П. {primary_id}]."
+    elig = student_ctx.get("eligibility") or {}
+    if doc_slug == "military-registry" and elig and not elig.get("military"):
+        return (
+            "По данным вашего профиля воинский учёт через вуз не ведётся, поэтому справка по Приложению № 4 "
+            f"в вашем каталоге не показывается; при необходимости обратитесь в военно-учётный стол [П. {primary_id}]."
+        )
+    if doc_slug == "scholarships" and elig and not elig.get("scholarship"):
+        return (
+            f"С учётом вашего профиля ({funding.lower()}): академическая стипендия назначается только "
+            f"обучающимся на бюджетной основе [П. {primary_id}]."
+        )
     if doc_slug == "scholarships":
         return (
             f"С учётом вашего профиля: сейчас назначено {student_ctx['scholar_monthly']} в месяц "
             f"(выплата {student_ctx['scholar_next']}), рейтинг {rating}/100 [П. {primary_id}]."
         )
+    if doc_slug == "dormitory" and elig and not elig.get("dorm"):
+        return f"С учётом вашего профиля: вы не проживаете в студенческом доме, начислений за проживание нет [П. {primary_id}]."
     if doc_slug == "dormitory":
         if student_ctx["unpaid_dorm_rub"]:
             return (
@@ -553,6 +624,17 @@ def answer_question(
         return _not_found_payload(clean_q, attack=True)
 
     retrieved = BM25_INDEX.search(clean_q, top_k=4)
+    elig_ctx = student_ctx.get("eligibility") or {}
+    if elig_ctx and not elig_ctx.get("military") and not _MILITARY_TOPIC_RE.search(_normalize_text(clean_q)):
+        # Профильное правило: воинский учёт не подмешивается в ответы тем, у кого он не ведётся
+        retrieved = [c for c in retrieved if c["doc_slug"] != "military-registry"]
+    intent = detect_service_intent(clean_q)
+    if intent:
+        intent_clauses = [CLAUSE_BY_ID[cid] for cid in intent["clauses"] if cid in CLAUSE_BY_ID]
+        short_query = len(tokenize_ru(clean_q)) <= 5
+        merged = (intent_clauses + retrieved) if (short_query or not retrieved) else (retrieved + intent_clauses)
+        seen_ids = set()
+        retrieved = [c for c in merged if not (c["id"] in seen_ids or seen_ids.add(c["id"]))][:4]
     # Contextual follow-up support from the last user turn when current question is a short clarification
     if not retrieved and history:
         q_stems = set(tokenize_ru(clean_q, expand=True))
@@ -602,10 +684,21 @@ def answer_question(
         out["tokens_used"] = tokens_spent
         return out
 
+    elig = student_ctx.get("eligibility") or {}
     seen_urls = set()
     actions = []
+    if intent and (intent["requires"] is None or elig.get(intent["requires"], True)):
+        seen_urls.add(intent["action"][1])
+        actions.append({"label": intent["action"][0], "url": intent["action"][1]})
+    blocked_prefixes = []
+    if elig and not elig.get("dorm"):
+        blocked_prefixes += ["/finance?tab=dorm", "/dorm"]
+    if elig and not elig.get("scholarship"):
+        blocked_prefixes += ["/finance?tab=scholarship"]
     for cl in used_clauses:
         for act_label, act_url in cl["actions"]:
+            if any(act_url.startswith(bp) for bp in blocked_prefixes):
+                continue
             if act_url not in seen_urls:
                 seen_urls.add(act_url)
                 actions.append({"label": act_label, "url": act_url})

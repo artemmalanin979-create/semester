@@ -1,0 +1,24 @@
+{% from 'components.html' import icon %}
+<div class="chat-msg user" id="chat-{{ msg.id }}">
+  <p>{{ msg.question }}</p>
+</div>
+<div class="chat-msg bot{% if not msg.found %} is-not-found{% endif %}">
+  {% for para in msg.paragraphs %}
+  <p>{{ para }}</p>
+  {% endfor %}
+  {% if msg.citations %}
+  <div class="chat-cites" aria-label="Источники">
+    {% for cite in msg.citations %}
+    <a class="chat-cite num" href="{{ cite.url }}" title="{{ cite.title }}">П. {{ cite.id }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if msg.actions %}
+  <div class="chat-actions">
+    {% for act in msg.actions %}
+    <a class="btn {{ 'btn-primary' if loop.first else 'btn-ghost' }} compact" href="{{ act.url }}"><span>{{ act.label }}</span>{% if loop.first %}{{ icon('arrow', 14) }}{% endif %}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <small class="chat-mode">{{ msg.mode_label }}</small>
+</div>

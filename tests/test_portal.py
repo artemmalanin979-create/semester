@@ -122,16 +122,30 @@ class PortalTest(unittest.TestCase):
     def test_instant_certificates_issue_immediately_with_specialized_sheets(self):
         self.login()
         reqs_page = self.browser.get("/requests")
-        res = self.browser.post("/requests/instant/military", data={
+        # Military registration certificate is not offered to Lera (profile rule) and is rejected server-side
+        self.assertNotIn("Справка в военкомат", reqs_page.get_data(as_text=True))
+        refused = self.browser.post("/requests/instant/military", data={
             "_csrf": token(reqs_page),
             "nonce": token(reqs_page, "nonce"),
+        })
+        self.assertEqual(refused.status_code, 404)
+        self.assertEqual(self.browser.get("/requests/new/military").status_code, 404)
+
+        misha = self.app.test_client()
+        self.login(misha, 1)
+        misha_page = misha.get("/requests")
+        self.assertIn("Справка в военкомат", misha_page.get_data(as_text=True))
+        res = misha.post("/requests/instant/military", data={
+            "_csrf": token(misha_page),
+            "nonce": token(misha_page, "nonce"),
         })
         self.assertEqual(res.status_code, 303)
         doc_path = urlsplit(res.location).path
         self.assertTrue(doc_path.endswith("/document"))
-        doc_html = self.browser.get(doc_path).get_data(as_text=True)
+        doc_html = misha.get(doc_path).get_data(as_text=True)
         self.assertIn("Приложение № 4", doc_html)
-        self.assertIn("38.03.02 Менеджмент", doc_html)
+        self.assertIn("41.03.05 Международные отношения", doc_html)
+        self.assertIn("31 августа 2027", doc_html)
 
         # Income statement contains 6-month payout table
         reqs_page2 = self.browser.get("/requests")
@@ -143,13 +157,11 @@ class PortalTest(unittest.TestCase):
         self.assertIn("ГАС + рейтинговая надбавка", inc_html)
 
         # Other student gets 404 on instant document
-        other = self.app.test_client()
-        self.login(other, 1)
-        self.assertEqual(other.get(doc_path).status_code, 404)
+        self.assertEqual(self.browser.get(doc_path).status_code, 404)
 
     def test_dormitory_payment_is_idempotent_and_receipt_is_owner_isolated(self):
         self.login()
-        campus_page = self.browser.get("/campus")
+        campus_page = self.browser.get("/finance?tab=dorm")
         self.assertEqual(campus_page.status_code, 200)
         self.assertIn("ОД-24/412", campus_page.get_data(as_text=True))
         # Unpaid receipt is 404 before payment
@@ -158,7 +170,7 @@ class PortalTest(unittest.TestCase):
         # Other student cannot pay Lera's dorm charge
         other = self.app.test_client()
         self.login(other, 1)
-        other_campus = other.get("/campus")
+        other_campus = other.get("/finance?tab=dorm")
         self.assertEqual(
             other.post("/campus/pay/chg-1-nov", data={"_csrf": token(other_campus), "method": "sbp"}).status_code,
             404,
@@ -179,7 +191,7 @@ class PortalTest(unittest.TestCase):
 
     def test_guest_pass_and_coworking_booking_enforce_ownership(self):
         self.login()
-        campus_page = self.browser.get("/campus")
+        campus_page = self.browser.get("/dorm?tab=guest")
         csrf_tok = token(campus_page)
         visit_date = re.search(r'<select id="guest_date" name="visit_date">\s*<option value="([^"]+)"', campus_page.get_data(as_text=True))[1]
 
@@ -190,7 +202,8 @@ class PortalTest(unittest.TestCase):
             "location": "Студдом № 2",
         })
         self.assertEqual(gp.status_code, 303)
-        updated_html = self.browser.get("/campus").get_data(as_text=True)
+        self.assertIn("/dorm?tab=guest", gp.location)
+        updated_html = self.browser.get("/dorm?tab=guest").get_data(as_text=True)
         self.assertIn("Маяков Илья Сергеевич", updated_html)
         pass_id = re.search(r'/campus/guest-pass/([0-9a-f]+)/revoke', updated_html)[1]
 
@@ -202,28 +215,61 @@ class PortalTest(unittest.TestCase):
             "purpose": "Подготовка кейса",
         })
         self.assertEqual(bk.status_code, 303)
-        updated_html = self.browser.get("/campus").get_data(as_text=True)
+        self.assertIn("/spaces?tab=cowork", bk.location)
+        updated_html = self.browser.get("/spaces?tab=cowork").get_data(as_text=True)
         self.assertIn("Проектный бокс К–1", updated_html)
+        # Coworking booking is not mixed into the meeting-rooms subtab
+        self.assertNotIn("/campus/book-room/" + re.search(r'/campus/book-room/([0-9a-f]+)/cancel', updated_html)[1], self.browser.get("/spaces?tab=rooms").get_data(as_text=True))
         booking_id = re.search(r'/campus/book-room/([0-9a-f]+)/cancel', updated_html)[1]
 
         # Other student cannot revoke Lera's guest pass or room booking
         other = self.app.test_client()
         self.login(other, 1)
-        other_csrf = token(other.get("/campus"))
+        other_csrf = token(other.get("/dorm?tab=guest"))
         self.assertEqual(other.post(f"/campus/guest-pass/{pass_id}/revoke", data={"_csrf": other_csrf}).status_code, 404)
         self.assertEqual(other.post(f"/campus/book-room/{booking_id}/cancel", data={"_csrf": other_csrf}).status_code, 404)
 
-    def test_smart_navigator_personalizes_context_per_student(self):
+    def test_finance_dorm_and_spaces_subtabs_show_one_topic_each(self):
         self.login()
-        lera_nav = self.browser.get("/navigator?q=общежитие").get_data(as_text=True)
-        self.assertIn("ОД-24/412", lera_nav)
-        self.assertNotIn("ОД-23/109", lera_nav)
-
+        scholarship = self.browser.get("/finance").get_data(as_text=True)
+        self.assertIn('aria-current="page">Стипендия и выплаты', scholarship)
+        self.assertIn("ГАС", scholarship)
+        self.assertNotIn("ОД-24/412", scholarship)  # dorm contract is not on the scholarship screen
+        dorm_pay = self.browser.get("/finance?tab=dorm").get_data(as_text=True)
+        self.assertIn('aria-current="page">Оплата общежития', dorm_pay)
+        self.assertIn("ОД-24/412", dorm_pay)
+        self.assertNotIn("Государственная академическая стипендия", dorm_pay)
+        self.assertNotIn("Деловой испанский", dorm_pay)
+        payments = self.browser.get("/finance?tab=payments").get_data(as_text=True)
+        self.assertIn("Деловой испанский", payments)
+        self.assertNotIn("Проживание в Студдоме № 2 (комн. Б–614)</strong>", payments.split("Квитанции")[0])
+        # Unknown tab falls back to the first subtab; the old combined screen redirects
+        self.assertIn('aria-current="page">Стипендия и выплаты', self.browser.get("/finance?tab=zzz").get_data(as_text=True))
+        self.assertEqual(self.browser.get("/campus").status_code, 301)
+        living = self.browser.get("/dorm").get_data(as_text=True)
+        self.assertIn("Н. П. Громова", living)
+        self.assertNotIn('id="guest_name"', living)
+        guest = self.browser.get("/dorm?tab=guest").get_data(as_text=True)
+        self.assertIn('id="guest_name"', guest)
+        self.assertNotIn("Н. П. Громова", guest)
+        rooms = self.browser.get("/spaces").get_data(as_text=True)
+        self.assertIn("Переговорная К–2", rooms)
+        self.assertNotIn("Коворкинг «Галерея»", rooms)
+        cowork = self.browser.get("/spaces?tab=cowork").get_data(as_text=True)
+        self.assertIn("Коворкинг «Галерея»", cowork)
+        self.assertNotIn("Переговорная К–2", cowork)
+        order = self.browser.get("/requests").get_data(as_text=True)
+        self.assertIn('aria-current="page">Заказать справку', order)
+        self.assertNotIn('id="office-slots"', order)
+        mine = self.browser.get("/requests?tab=mine").get_data(as_text=True)
+        self.assertIn('id="office-slots"', mine)
+        self.assertNotIn('id="cert-study"', mine)
+        # Subtabs are plain links (no JS needed), personal contracts stay isolated
         other = self.app.test_client()
         self.login(other, 1)
-        misha_nav = other.get("/navigator?q=общежитие").get_data(as_text=True)
-        self.assertIn("ОД-23/109", misha_nav)
-        self.assertNotIn("ОД-24/412", misha_nav)
+        misha_dorm = other.get("/finance?tab=dorm").get_data(as_text=True)
+        self.assertIn("ОД-23/109", misha_dorm)
+        self.assertNotIn("ОД-24/412", misha_dorm)
 
     def test_schedule_and_grades_differ_between_students(self):
         self.login()
@@ -366,9 +412,11 @@ class PortalTest(unittest.TestCase):
         self.assertNotRegex(login_html, r"<script(?![^>]*\bsrc=)")
         self.login()
         for path in (
-            "/", "/navigator", "/schedule", "/schedule?view=week", "/grades",
-            "/requests", "/requests/new/study", "/requests/new/medical",
-            "/campus", "/campus/receipt/chg-1-oct", "/notifications", "/profile",
+            "/", "/assistant", "/schedule", "/schedule?view=week", "/grades",
+            "/requests", "/requests?tab=mine", "/requests/new/study", "/requests/new/medical",
+            "/finance", "/finance?tab=dorm", "/finance?tab=payments", "/dorm", "/dorm?tab=guest",
+            "/spaces", "/spaces?tab=cowork", "/more",
+            "/campus/receipt/chg-1-oct", "/notifications", "/profile",
         ):
             html = self.browser.get(path).get_data(as_text=True)
             self.assertNotRegex(html, r"\sstyle=", msg=path)
@@ -391,7 +439,7 @@ class PortalTest(unittest.TestCase):
     def test_public_qr_verify_masks_name_and_enforces_revoke_ownership(self):
         self.login()
         reqs_page = self.browser.get("/requests")
-        issued = self.browser.post("/requests/instant/military", data={
+        issued = self.browser.post("/requests/instant/study", data={
             "_csrf": token(reqs_page),
             "nonce": token(reqs_page, "nonce"),
         })
@@ -442,6 +490,7 @@ class PortalTest(unittest.TestCase):
         })
         self.assertEqual(gap_res.status_code, 303)
         self.assertIn("Проектный бокс К–1", self.browser.get("/").get_data(as_text=True))
+        self.assertIn("Проектный бокс К–1", self.browser.get("/spaces?tab=cowork").get_data(as_text=True))
 
         staff = self.app.test_client()
         self.login(staff, 2)
@@ -472,7 +521,7 @@ class PortalTest(unittest.TestCase):
         self.assertEqual(anon.get(urlsplit(doc_decoded).path).status_code, 200)
 
         # 3. Guest pass QR on /campus decodes to public /verify/guest/<id>
-        campus_page = self.browser.get("/campus")
+        campus_page = self.browser.get("/dorm?tab=guest")
         vdate = re.search(r'<select id="guest_date" name="visit_date">\s*<option value="([^"]+)"', campus_page.get_data(as_text=True))[1]
         self.browser.post("/campus/guest-pass", data={
             "_csrf": token(campus_page),
@@ -480,23 +529,24 @@ class PortalTest(unittest.TestCase):
             "visit_date": vdate,
             "location": "Студдом № 2",
         })
-        campus_after = self.browser.get("/campus").get_data(as_text=True)
+        campus_after = self.browser.get("/dorm?tab=guest").get_data(as_text=True)
         guest_decoded = decode_rendered_qr(campus_after, index=0)
         self.assertIn("/verify/guest/", guest_decoded)
         guest_verify = anon.get(urlsplit(guest_decoded).path)
         self.assertEqual(guest_verify.status_code, 200)
         self.assertIn("Маяков И. С.", guest_verify.get_data(as_text=True))
 
-    def test_navigator_honest_empty_state_without_confident_misses(self):
+    def test_old_navigator_redirects_to_assistant_chat(self):
         self.login()
-        for q in ("как перевестись на бюджет", "хочу академ", "где находится столовая"):
-            html = self.browser.get(f"/navigator?q={q}").get_data(as_text=True)
-            self.assertNotIn("data-nav-card", html, msg=q)
-            self.assertIn("Не нашёл готового сценария", html, msg=q)
-            self.assertIn("Спросить ассистента", html, msg=q)
-            self.assertIn("Написать в учебный офис", html, msg=q)
+        res = self.browser.get("/navigator?q=общежитие")
+        self.assertEqual(res.status_code, 301)
+        self.assertTrue(res.location.startswith("/assistant?q="))
+        home = self.browser.get("/").get_data(as_text=True)
+        self.assertNotIn("/navigator", home)
+        self.assertIn("data-open-chat", home)
+        self.assertIn('id="chat-panel"', home)
 
-        # Prefill from navigator empty state into appeal form
+        # Prefill from the assistant's "not found" action into appeal form
         appeal_html = self.browser.get("/requests/new/appeal?q=как+перевестись+на+бюджет").get_data(as_text=True)
         self.assertIn("как перевестись на бюджет", appeal_html)
 
@@ -515,11 +565,11 @@ class PortalTest(unittest.TestCase):
         })
         self.assertEqual(login_res.status_code, 303)
 
-        # Pollute DB with extra military certificates
+        # Pollute DB with extra study certificates
         for _ in range(3):
             rp = client.get("/requests")
-            client.post("/requests/instant/military", data={"_csrf": token(rp), "nonce": token(rp, "nonce")})
-        self.assertGreaterEqual(client.get("/requests").get_data(as_text=True).count("Справка в военкомат (Прил. № 4)"), 4)
+            client.post("/requests/instant/study", data={"_csrf": token(rp), "nonce": token(rp, "nonce")})
+        self.assertGreaterEqual(client.get("/requests?tab=mine").get_data(as_text=True).count("Справка об обучении"), 3)
 
         # Run flask reset-demo CLI
         res = custom_app.test_cli_runner().invoke(args=["reset-demo"])
@@ -527,7 +577,7 @@ class PortalTest(unittest.TestCase):
         self.assertIn("Demo data reset complete", res.output)
 
         # Extra certificates are gone (only Lera's 2 seeded items remain in .request-row)
-        reqs_after = client.get("/requests").get_data(as_text=True)
+        reqs_after = client.get("/requests?tab=mine").get_data(as_text=True)
         self.assertEqual(reqs_after.count("request-row"), 2)
 
         # Custom password hash from env is preserved

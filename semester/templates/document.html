@@ -98,7 +98,7 @@
       <div><dt>Приказ о зачислении</dt><dd class="num">{{ student_meta.order_no }}</dd></div>
       <div><dt>Код и направление</dt><dd>{{ student_meta.program_code }}</dd></div>
       <div><dt>Государственная аккредитация</dt><dd>Действующая очная программа бакалавриата</dd></div>
-      <div><dt>Нормативный срок окончания</dt><dd>До {{ student_meta.pass_valid }}</dd></div>
+      <div><dt>Нормативный срок окончания</dt><dd>До {{ student_meta.study_end }}</dd></div>
       <div><dt>Военно-учётный стол</dt><dd>Корпус В, каб. В–102 · предоставляется по месту учёта</dd></div>
     </dl>
     {% elif item.kind == 'dorm_cert' and dorm %}
@@ -106,13 +106,13 @@
       <div><dt>Объект размещения</dt><dd>{{ dorm.building }} ({{ dorm.address }})</dd></div>
       <div><dt>Жилое помещение</dt><dd class="num">{{ dorm.room }}</dd></div>
       <div><dt>Договор найма</dt><dd class="num">№ {{ dorm.contract }}</dd></div>
-      <div><dt>Основание проживания</dt><dd>Очное обучение, период до {{ student_meta.pass_valid }}</dd></div>
+      <div><dt>Основание проживания</dt><dd>Очное обучение, период до {{ student_meta.study_end }}</dd></div>
     </dl>
     {% else %}
     <dl class="doc-kv-grid">
       <div><dt>Форма и основа</dt><dd>{{ student_meta.degree }} · {{ student_meta.funding|lower }}</dd></div>
       <div><dt>Приказ о зачислении</dt><dd class="num">{{ student_meta.order_no }}</dd></div>
-      <div><dt>Нормативный срок</dt><dd>До {{ student_meta.pass_valid }}</dd></div>
+      <div><dt>Нормативный срок</dt><dd>До {{ student_meta.study_end }}</dd></div>
       <div><dt>Назначение справки</dt><dd>{{ item.comment or 'По месту требования' }}</dd></div>
     </dl>
     {% endif %}

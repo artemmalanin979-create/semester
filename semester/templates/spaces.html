@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading, state_badge, section_tabs %}
+{% block title %}Пространства · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Пространства', 'Переговорные для встреч и открытые места коворкинга — бронь слотами по 1,5 часа.') }}
+{{ section_tabs('Подразделы пространств', 'spaces', tab, subtabs.spaces) }}
+
+<section class="tab-panel" aria-labelledby="spaces-heading">
+  <div class="section-heading">
+    <div>
+      <h2 id="spaces-heading">{{ 'Переговорные' if tab == 'rooms' else 'Коворкинг' }}</h2>
+      <p>{{ 'Закрытые комнаты для командных встреч и записи презентаций' if tab == 'rooms' else 'Открытые рабочие места между парами' }}</p>
+    </div>
+  </div>
+
+  <div class="space-list">
+    {% for sid_key, stitle, smeta in spaces %}
+    <article class="surface space-card">
+      <div class="space-card-copy">
+        <strong>{{ stitle }}</strong>
+        <small>{{ smeta }}</small>
+      </div>
+      <ul class="slot-chips" aria-label="Занятость на {{ fmt_date(booking_days[0]) }}">
+        {% for sl in booking_slots %}
+        {% set busy = (sid_key, booking_days[0].isoformat(), sl) in taken_bookings %}
+        <li class="slot-chip{% if busy %} is-busy{% endif %} num">{{ sl }}<span class="sr-only">{{ ' — занято' if busy else ' — свободно' }}</span></li>
+        {% endfor %}
+      </ul>
+    </article>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="{{ url_for('campus_book_room') }}" class="surface detail-panel announce-form form-narrow">
+    {{ csrf_field(csrf) }}
+    <div class="field-group">
+      <label for="space_id">{{ 'Переговорная' if tab == 'rooms' else 'Место в коворкинге' }}</label>
+      <select id="space_id" name="space_id">
+        {% for sid_key, stitle, smeta in spaces %}
+        <option value="{{ sid_key }}">{{ stitle }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-row-2">
+      <div class="field-group">
+        <label for="booking_date">День</label>
+        <select id="booking_date" name="booking_date">
+          {% for d in booking_days %}
+          <option value="{{ d.isoformat() }}">{{ weekdays[d.weekday()] }}, {{ fmt_date(d) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="slot_label">Время</label>
+        <select id="slot_label" name="slot_label">
+          {% for sl in booking_slots %}
+          <option value="{{ sl }}">{{ sl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <label for="purpose">Тема встречи <small>необязательно</small></label>
+      <input type="text" id="purpose" name="purpose" maxlength="120" placeholder="Командный проект / подготовка к семинару">
+    </div>
+    <button type="submit" class="btn btn-primary">Забронировать</button>
+  </form>
+
+  <h3 class="sub-heading" id="my-bookings">Мои брони</h3>
+  <div class="surface boxed-list">
+    {% for bk in my_bookings %}
+    <div class="guest-pass-item">
+      <span class="row-glyph">{{ icon('door', 18) }}</span>
+      <div class="row-copy">
+        <strong>{{ bk.space_title }}</strong>
+        <small><span class="num">{{ bk.booking_date }} · {{ bk.slot_label }}</span> · {{ bk.purpose }}</small>
+      </div>
+      <form method="post" action="{{ url_for('campus_cancel_room', booking_id=bk.id) }}">
+        {{ csrf_field(csrf) }}
+        <input type="hidden" name="tab" value="{{ tab }}">
+        <button type="submit" class="btn btn-ghost compact">Отменить</button>
+      </form>
+    </div>
+    {% else %}
+    <p class="empty">Активных броней нет.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

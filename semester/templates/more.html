@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, pageheading %}
+{% block title %}Ещё · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Ещё', 'Остальные разделы кабинета') }}
+<nav class="surface boxed-list" aria-label="Остальные разделы">
+  {% for endpoint, glyph, title, note in [
+    ('dorm', 'bed', 'Общежитие', 'Проживание и гостевой пропуск'),
+    ('spaces', 'door', 'Пространства', 'Переговорные и коворкинг'),
+    ('notifications', 'bell', 'Уведомления', (unread_count ~ ' непрочитанных') if unread_count else 'Всё прочитано'),
+    ('assistant_view', 'message', 'Спроси деканат', 'Ассистент по регламентам'),
+    ('rules_view', 'book', 'Регламенты', 'Сборник положений «Семестра»'),
+    ('profile', 'user', 'Профиль и пропуск', g.student.student_group ~ ' · ' ~ g.student.course ~ ' курс'),
+  ] %}
+  <a class="box-row" href="{{ url_for(endpoint) }}">
+    <span class="row-glyph">{{ icon(glyph, 18) }}</span>
+    <span class="row-copy"><strong>{{ title }}</strong><small>{{ note }}</small></span>
+    <span class="row-arrow">{{ icon('chevron', 16) }}</span>
+  </a>
+  {% endfor %}
+</nav>
+{% endblock %}

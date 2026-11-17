@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, csrf_field, pageheading, state_badge, section_tabs, qr_code %}
+{% block title %}Общежитие · Семестр{% endblock %}
+{% block content %}
+{{ pageheading('Общежитие', dorm.building ~ ' · ' ~ dorm.address if dorm else 'Проживание в студенческом доме и гостевые пропуска') }}
+{{ section_tabs('Подразделы общежития', 'dorm', tab, subtabs.dorm) }}
+
+{% if tab == 'living' %}
+<section class="tab-panel" aria-labelledby="living-heading">
+  <div class="section-heading">
+    <div>
+      <h2 id="living-heading">Проживание</h2>
+      <p>Адрес, комната, договор и контакты коменданта</p>
+    </div>
+  </div>
+  {% if dorm %}
+  <div class="surface detail-panel">
+    <dl class="mini-dl">
+      <div><dt>Студенческий дом</dt><dd>{{ dorm.building }} · {{ dorm.address }}</dd></div>
+      <div><dt>Комната</dt><dd class="num">{{ dorm.room }}</dd></div>
+      <div><dt>Договор найма</dt><dd class="num">{{ dorm.contract }} · {{ fmt_rub(dorm.monthly_rub) }} в месяц</dd></div>
+      <div><dt>Комендант</dt><dd>{{ dorm.warden }}</dd></div>
+      <div><dt>Гости</dt><dd>{{ dorm.guest_hours }}</dd></div>
+    </dl>
+  </div>
+  <div class="tab-actions">
+    <form method="post" action="{{ url_for('request_instant', kind='dorm_cert') }}">
+      {{ csrf_field(csrf) }}
+      <input type="hidden" name="nonce" value="{{ instant_nonce }}">
+      <button type="submit" class="btn btn-primary">{{ icon('file', 15) }}<span>Справка о проживании</span></button>
+    </form>
+    <a class="text-link" href="{{ url_for('finance', tab='dorm') }}">
+      <span>{{ 'Оплатить проживание · ' ~ fmt_rub(unpaid_dorm.amount) if unpaid_dorm else 'Оплата проживания и квитанции' }}</span>{{ icon('arrow', 15) }}
+    </a>
+  </div>
+  {% else %}
+  <div class="surface detail-panel empty-state">
+    <strong>Вы не проживаете в студенческом доме</strong>
+    <p>Гостевой пропуск в учебные корпуса доступен на соседней вкладке.</p>
+  </div>
+  {% endif %}
+</section>
+
+{% else %}
+<section class="tab-panel" aria-labelledby="guest-heading">
+  <div class="section-heading">
+    <div>
+      <h2 id="guest-heading">Гостевой пропуск</h2>
+      <p>Разовый QR-пропуск для гостя · вход с 09:00 до 22:00 по паспорту</p>
+    </div>
+  </div>
+  <form method="post" action="{{ url_for('campus_guest_pass') }}" class="surface detail-panel announce-form form-narrow">
+    {{ csrf_field(csrf) }}
+    <div class="field-group">
+      <label for="guest_name">ФИО гостя (по паспорту)</label>
+      <input type="text" id="guest_name" name="guest_name" minlength="5" maxlength="100" placeholder="Например: Маяков Илья Сергеевич" required>
+    </div>
+    <div class="form-row-2">
+      <div class="field-group">
+        <label for="guest_date">Дата визита</label>
+        <select id="guest_date" name="visit_date">
+          {% for d in booking_days %}
+          <option value="{{ d.isoformat() }}">{{ weekdays[d.weekday()] }}, {{ fmt_date(d) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="guest_loc">Куда проходит гость</label>
+        <select id="guest_loc" name="location">
+          {% if dorm %}<option value="{{ dorm.building }}">{{ dorm.building }}</option>{% endif %}
+          <option value="Учебный корпус А">Учебный корпус А</option>
+          <option value="Учебный корпус Б">Учебный корпус Б</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Выпустить гостевой QR-пропуск</button>
+  </form>
+
+  <h3 class="sub-heading" id="guest-list">Выпущенные пропуска</h3>
+  <div class="surface boxed-list">
+    {% for gp in guest_passes %}
+    <div class="guest-pass-item">
+      <div class="guest-qr-mini">{{ qr_code(gp.qr, 56) }}</div>
+      <div class="row-copy">
+        <strong>{{ gp.guest_name }}</strong>
+        <small><span class="num">{{ gp.code }}</span> · {{ gp.location }} · <span class="num">{{ gp.visit_date }}</span></small>
+      </div>
+      <form method="post" action="{{ url_for('campus_revoke_guest', pass_id=gp.id) }}">
+        {{ csrf_field(csrf) }}
+        <button type="submit" class="btn btn-ghost compact">Отозвать</button>
+      </form>
+    </div>
+    {% else %}
+    <p class="empty">Гостевых пропусков пока нет.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

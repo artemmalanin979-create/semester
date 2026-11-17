@@ -189,6 +189,16 @@ def _ensure_columns(db):
         db.execute("UPDATE requests SET verify_token = ? WHERE id = ?", (secrets.token_urlsafe(16), r["id"]))
 
 
+def _sync_student_profiles(db):
+    """Keep seeded profile fields (course, group, programme) in line with demo.py without touching passwords."""
+    for sid, email, name, full_name, faculty, program, course, group, role in STUDENTS:
+        db.execute(
+            """UPDATE students SET email = ?, name = ?, full_name = ?, faculty = ?, program = ?,
+                   course = ?, student_group = ?, role = ? WHERE id = ?""",
+            (email, name, full_name, faculty, program, course, group, role, sid),
+        )
+
+
 def _seed_charges(db, stamp):
     existing_charges = {row["id"] for row in db.execute("SELECT id FROM charges").fetchall()}
     for cid, sid, cat, title, contract_no, period_lbl, amount, due_lbl, st in INITIAL_CHARGES:
@@ -320,6 +330,7 @@ def initialize(path, password_hashes):
                     "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (*STUDENTS[2], password_hashes[2]),
                 )
+            _sync_student_profiles(db)
             _seed_charges(db, stamp)
             if db.execute("SELECT COUNT(*) AS c FROM assistant_gaps").fetchone()["c"] == 0:
                 _seed_gaps(db, stamp)

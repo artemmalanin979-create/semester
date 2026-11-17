@@ -3,7 +3,7 @@
 {% block title %}Спроси деканат · Семестр{% endblock %}
 {% block content %}
 <a class="text-link back-link" href="{{ url_for('home') }}">{{ icon('left', 16) }}<span>На главную</span></a>
-{% call pageheading('Спроси деканат', 'Ответы строго по 8 положениям «Семестра» с проверкой сносок [П. X.Y] и учётом вашего курса, группы и договоров.') %}
+{% call pageheading('Спроси деканат', 'Ассистент «Семестр»: ответы по положениям со сносками [П. X.Y] и кнопки перехода прямо в нужную форму.') %}
   <a class="btn btn-ghost" href="{{ url_for('rules_view') }}">
     {{ icon('book', 16) }}<span>Все регламенты</span>
   </a>
@@ -25,7 +25,7 @@
       <span class="row-glyph">{{ icon('spark', 18) }}</span>
       <div>
         <strong>Контроль цитирования без домыслов</strong>
-        <p>Ассистент ищет релевантные статьи по 69 пунктам положений и оставляет только подтверждённые ссылки вида <span class="num">[П. X.Y]</span>. Если нормы в базе нет — прямо сообщает об этом и даёт переход в учебный офис.</p>
+        <p>Ассистент ищет релевантные статьи по {{ clause_total }} пунктам положений и оставляет только подтверждённые ссылки вида <span class="num">[П. X.Y]</span>. Если нормы в базе нет — прямо сообщает об этом и даёт переход в учебный офис.</p>
       </div>
     </div>
     {{ state_badge('GigaChat + BM25' if has_gigachat else 'Поиск по регламентам · BM25', 'ok') }}
@@ -33,12 +33,15 @@
 
   <section class="surface detail-panel assistant-prompts-panel" aria-label="Быстрые вопросы по регламентам">
     <div class="assistant-prompts-head">
-      <strong>Проверить частый вопрос в 1 клик</strong>
+      <strong>Частые темы</strong>
       <span class="num">Группа {{ g.student.student_group }} · {{ g.student.course }} курс</span>
     </div>
     <form method="post" action="{{ url_for('assistant_ask') }}" class="chip-row" data-assistant-form>
       {{ csrf_field(csrf) }}
-      {% for p in prompts %}
+      {% for p in quick_prompts %}
+      <button type="submit" name="question" value="{{ p }}" class="quick-chip">{{ p }}</button>
+      {% endfor %}
+      {% for p in prompts[:3] %}
       <button type="submit" name="question" value="{{ p }}" class="quick-chip">{{ p }}</button>
       {% endfor %}
     </form>

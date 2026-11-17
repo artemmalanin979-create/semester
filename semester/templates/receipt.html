@@ -3,7 +3,7 @@
 {% block title %}Квитанция {{ charge.receipt_code }} · Семестр{% endblock %}
 {% block content %}
 <div class="doc-toolbar no-print">
-  <a class="text-link back-link" href="{{ url_for('campus') }}">{{ icon('left', 16) }}<span>Финансы и кампус</span></a>
+  <a class="text-link back-link" href="{{ url_for('finance', tab='payments') }}">{{ icon('left', 16) }}<span>Платежи и квитанции</span></a>
   <button type="button" class="btn btn-primary compact" data-print hidden>{{ icon('print', 16) }}<span>Печать или PDF</span></button>
 </div>
 

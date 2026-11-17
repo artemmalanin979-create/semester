@@ -243,91 +243,6 @@
     });
   });
 
-  // Live instant filter on /navigator (honest empty state when no trigger matches)
-  const navLiveInput = document.querySelector("[data-nav-live-input]");
-  if (navLiveInput) {
-    const cards = document.querySelectorAll("[data-nav-card]");
-    const emptyBox = document.querySelector("[data-nav-empty]");
-    const askBtn = document.querySelector("[data-nav-ask-btn]");
-    const officeBtn = document.querySelector("[data-nav-office-btn]");
-    const outOfPlaybook = ["академ", "бюджет", "отчислен", "восстановлен", "другой вуз", "смена программ", "перевестись"];
-    navLiveInput.addEventListener("input", () => {
-      const raw = navLiveInput.value.trim();
-      const q = raw.toLowerCase().replace(/ё/g, "е");
-      if (askBtn) {
-        askBtn.setAttribute("href", raw ? `/assistant?q=${encodeURIComponent(raw)}` : "/assistant");
-      }
-      if (officeBtn) {
-        officeBtn.setAttribute("href", raw ? `/requests/new/appeal?q=${encodeURIComponent(raw)}` : "/requests/new/appeal");
-      }
-      if (!q) {
-        cards.forEach((c) => {
-          c.hidden = false;
-        });
-        if (emptyBox) emptyBox.hidden = true;
-        return;
-      }
-      if (outOfPlaybook.some((m) => q.includes(m))) {
-        cards.forEach((c) => {
-          c.hidden = true;
-        });
-        if (emptyBox) emptyBox.hidden = false;
-        return;
-      }
-      const tokens = (q.match(/[а-яa-z0-9]+/g) || []).filter((t) => t.length >= 3 || t === "qr" || t === "095");
-      let matchedAny = false;
-      cards.forEach((c) => {
-        const triggers = (c.getAttribute("data-nav-triggers") || "").split("|").filter(Boolean);
-        const hit = tokens.length > 0 && triggers.some((trig) =>
-          trig.includes(" ") ? q.includes(trig) : tokens.some((tok) => tok.startsWith(trig))
-        );
-        c.hidden = !hit;
-        if (hit) matchedAny = true;
-      });
-      if (emptyBox) emptyBox.hidden = matchedAny;
-    });
-  }
-
-  // Copy request code button
-  document.querySelectorAll("[data-copy-text]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const value = btn.getAttribute("data-copy-text") || "";
-      if (!value || !navigator.clipboard) return;
-      try {
-        await navigator.clipboard.writeText(value);
-        btn.setAttribute("title", `Скопировано: #${value}`);
-      } catch {
-        /* ignore clipboard restrictions */
-      }
-    });
-  });
-
-  // Print button on /requests/<id>/document
-  document.querySelectorAll("[data-print]").forEach((btn) => {
-    btn.hidden = false;
-    btn.addEventListener("click", () => window.print());
-  });
-
-  // Live countdown on pending requests
-  const timerBox = document.querySelector("[data-countdown]");
-  if (timerBox) {
-    let remaining = parseInt(timerBox.getAttribute("data-countdown") || "0", 10);
-    const out = timerBox.querySelector("[data-countdown-value]");
-    if (remaining > 0 && out) {
-      const id = window.setInterval(() => {
-        remaining -= 1;
-        if (remaining <= 0) {
-          window.clearInterval(id);
-          window.location.reload();
-          return;
-        }
-        const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
-        const ss = String(remaining % 60).padStart(2, "0");
-        out.textContent = `${mm}:${ss}`;
-      }, 1000);
-    }
-  }
-
   // Modals: Command Palette (⌘K / Ctrl+K) and Campus Pass QR
   const cmdDialog = document.getElementById("cmd-palette");
   const cmdInput = document.getElementById("cmd-input");
@@ -416,6 +331,73 @@
           if (hit) anyClause = true;
         });
         doc.hidden = !anyClause;
+      });
+    });
+  }
+
+  // Ассистент «Спроси деканат»: плавающая кнопка открывает панель; без JS кнопка — обычная ссылка на /assistant
+  const chatDialog = document.getElementById("chat-panel");
+  if (chatDialog && typeof chatDialog.showModal === "function" && window.fetch) {
+    const feed = document.getElementById("chat-feed");
+    const typing = document.getElementById("chat-typing");
+    const errorBox = document.getElementById("chat-error");
+    const composerInput = chatDialog.querySelector(".chat-composer input[name='question']");
+    const scrollFeed = () => { if (feed) feed.scrollTop = feed.scrollHeight; };
+
+    document.querySelectorAll("[data-open-chat]").forEach((link) => {
+      link.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        chatDialog.showModal();
+        scrollFeed();
+        if (composerInput && window.matchMedia("(min-width: 681px)").matches) composerInput.focus();
+      });
+    });
+    chatDialog.addEventListener("click", (ev) => {
+      if (ev.target === chatDialog) chatDialog.close();
+    });
+
+    let busy = false;
+    chatDialog.querySelectorAll("[data-chat-form]").forEach((form) => {
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        if (busy) return;
+        const data = new FormData(form);
+        if (ev.submitter && ev.submitter.name) data.set(ev.submitter.name, ev.submitter.value);
+        const question = String(data.get("question") || "").trim();
+        if (question.length < 2) return;
+        busy = true;
+        if (errorBox) errorBox.hidden = true;
+        const pending = document.createElement("div");
+        pending.className = "chat-msg user";
+        const pendingText = document.createElement("p");
+        pendingText.textContent = question;
+        pending.appendChild(pendingText);
+        feed.insertBefore(pending, typing);
+        if (typing) typing.hidden = false;
+        scrollFeed();
+        try {
+          const resp = await fetch(form.action, {
+            method: "POST",
+            body: data,
+            headers: { "X-Semester-Chat": "1", "Accept": "application/json" },
+            credentials: "same-origin",
+          });
+          const payload = await resp.json();
+          pending.remove();
+          if (!resp.ok || !payload.html) throw new Error(payload.error || "Не удалось получить ответ.");
+          typing.insertAdjacentHTML("beforebegin", payload.html);
+          if (composerInput && form.contains(composerInput)) composerInput.value = "";
+        } catch (err) {
+          if (pending.isConnected) pending.remove();
+          if (errorBox) {
+            errorBox.textContent = err && err.message ? err.message : "Не удалось получить ответ.";
+            errorBox.hidden = false;
+          }
+        } finally {
+          if (typing) typing.hidden = true;
+          busy = false;
+          scrollFeed();
+        }
       });
     });
   }

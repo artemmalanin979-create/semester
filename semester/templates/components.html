@@ -43,6 +43,8 @@
 {% elif name == 'thumb-up' %}<path d="M7 11v8a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-7a1 1 0 0 1 1 -1h3a4 4 0 0 0 4 -4v-1a2 2 0 0 1 4 0v5h3a2 2 0 0 1 2 2l-1 5a2 3 0 0 1 -2 2h-7a3 3 0 0 1 -3 -3" />
 {% elif name == 'thumb-down' %}<path d="M7 13v-8a1 1 0 0 0 -1 -1h-2a1 1 0 0 0 -1 1v7a1 1 0 0 0 1 1h3a4 4 0 0 1 4 4v1a2 2 0 0 0 4 0v-5h3a2 2 0 0 0 2 -2l-1 -5a2 3 0 0 0 -2 -2h-7a3 3 0 0 0 -3 3" />
 {% elif name == 'send' %}<path d="M10 14l11 -11" /><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5" />
+{% elif name == 'bed' %}<path d="M5 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M22 17v-3h-20" /><path d="M2 8v9" /><path d="M12 14h10v-2a3 3 0 0 0 -3 -3h-7v5z" />
+{% elif name == 'dots' %}<path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
 {% elif name == 'close' %}<path d="M18 6l-12 12" /><path d="M6 6l12 12" />
 {% endif %}
 </svg>
@@ -118,7 +120,7 @@
   {% if gap.book_slot and csrf_fn is not none %}
     {% set booked = booked_slots.get((gap.book_date, gap.book_slot)) if booked_slots else None %}
     {% if booked %}
-      <a class="state ok gap-booked" href="{{ url_for('campus') }}#cowork-section">{{ booked.space_title }} · {{ gap.book_slot }}</a>
+      <a class="state ok gap-booked" href="{{ url_for('spaces', tab='cowork') }}">{{ booked.space_title }} · {{ gap.book_slot }}</a>
     {% else %}
       <form method="post" action="{{ url_for('campus_book_gap') }}" class="gap-book-form">
         {{ csrf_field(csrf_fn) }}
@@ -128,7 +130,7 @@
       </form>
     {% endif %}
   {% elif gap.cta_campus %}
-    <a class="gap-action" href="{{ url_for('campus') }}#cowork-section">Бокс коворкинга →</a>
+    <a class="gap-action" href="{{ url_for('spaces', tab='cowork') }}">Коворкинг →</a>
   {% endif %}
 </div>
 {% endif %}
@@ -144,4 +146,21 @@
   {{ state_badge(item.status, item.tone) }}
   <span class="row-arrow">{{ icon('chevron', 16) }}</span>
 </a>
+{% endmacro %}
+
+{# Подвкладки раздела: обычные ссылки (работают без JS и с клавиатуры), выбранная — aria-current="page" #}
+{% macro subnav(label, items) %}
+<nav class="subtabs" aria-label="{{ label }}">
+  {% for href, title, selected in items %}
+  <a class="subtab{% if selected %} selected{% endif %}" href="{{ href }}"{% if selected %} aria-current="page"{% endif %}>{{ title }}</a>
+  {% endfor %}
+</nav>
+{% endmacro %}
+
+{% macro section_tabs(label, endpoint, current, tabs) %}
+<nav class="subtabs" aria-label="{{ label }}">
+  {% for key, title in tabs %}
+  <a class="subtab{% if key == current %} selected{% endif %}" href="{{ url_for(endpoint, tab=key) }}"{% if key == current %} aria-current="page"{% endif %}>{{ title }}</a>
+  {% endfor %}
+</nav>
 {% endmacro %}

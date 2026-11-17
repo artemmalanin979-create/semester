@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
-{% from 'components.html' import icon, pageheading, lesson, state_badge %}
+{% from 'components.html' import subnav, icon, pageheading, lesson, state_badge %}
 {% block title %}Расписание · Семестр{% endblock %}
 {% block content %}
-{% call pageheading('Расписание', 'Группа ' ~ g.student.student_group ~ ' · ' ~ week_num ~ ' учебная неделя · МСК') %}
+{% call pageheading('Учёба', 'Группа ' ~ g.student.student_group ~ ' · ' ~ week_num ~ ' учебная неделя · МСК') %}
   <a class="btn btn-ghost compact" href="{{ url_for('schedule_ics', date=selected.isoformat()) }}" title="Скачать расписание недели (.ics)">
     {{ icon('download', 16) }}<span>Календарь .ics</span>
   </a>
 {% endcall %}
+{{ subnav('Подразделы учёбы', [(url_for('schedule'), 'Расписание', true), (url_for('grades'), 'Успеваемость', false)]) }}
 
 <div class="surface schedule-controls">
   <div class="schedule-toolbar">

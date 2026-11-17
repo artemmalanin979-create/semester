@@ -1,4 +1,4 @@
-{% from 'components.html' import icon, mark, qr_code %}
+{% from 'components.html' import icon, mark, qr_code, csrf_field %}
 <!doctype html>
 <html lang="ru"{% if theme_pref %} data-theme="{{ theme_pref }}"{% endif %}>
 <head>
@@ -12,8 +12,8 @@
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='11') }}">
-  <script defer src="{{ url_for('static', filename='portal.js', v='11') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='12') }}">
+  <script defer src="{{ url_for('static', filename='portal.js', v='12') }}"></script>
 </head>
 <body class="{{ 'signed-in' if g.student else 'signed-out' }}">
   <a class="skip-link" href="#content">К содержимому</a>
@@ -33,7 +33,7 @@
         <span class="nav-label">{{ label }}</span>
         {% if endpoint == 'notifications' and unread_count %}
         <span class="nav-count num" aria-label="Непрочитанных: {{ unread_count }}">{{ unread_count }}</span>
-        {% elif endpoint == 'campus' and unpaid_count %}
+        {% elif endpoint == 'finance' and unpaid_count %}
         <span class="nav-count warn-count num" aria-label="Счетов к оплате: {{ unpaid_count }}">{{ unpaid_count }}</span>
         {% elif endpoint == 'staff_dashboard' and pending_staff %}
         <span class="nav-count warn-count num" aria-label="Ожидают: {{ pending_staff }}">{{ pending_staff }}</span>
@@ -72,14 +72,6 @@
       <button type="button" class="icon-btn mobile-search-btn" data-open-cmd aria-label="Поиск по кабинету" title="Поиск (⌘K)">
         {{ icon('search', 18) }}
       </button>
-      {% if not is_staff %}
-      <a class="icon-btn assistant-top-btn" href="{{ url_for('assistant_view') }}" aria-label="Спроси деканат · ИИ по регламентам" title="Спроси деканат · ИИ по регламентам">
-        {{ icon('spark', 18) }}
-      </a>
-      <a class="icon-btn nav-top-btn" href="{{ url_for('navigator') }}" aria-label="Умный навигатор деканата" title="Умный навигатор ситуаций">
-        {{ icon('compass', 18) }}
-      </a>
-      {% endif %}
       <button type="button" class="icon-btn" data-open-pass aria-label="Электронный пропуск" title="Электронный пропуск">
         {{ icon('qrcode', 18) }}
       </button>
@@ -113,12 +105,13 @@
   </main>
 
   {% if g.student %}
+  {% set mob_active = active if active in mobile_keys else ('' if is_staff else 'more') %}
   <nav class="bottom-nav" aria-label="Разделы кабинета">
     {% for endpoint, glyph, short_label in mobile_nav %}
-    <a class="{% if active == endpoint %}selected{% endif %}" href="{{ url_for(endpoint) }}"{% if active == endpoint %} aria-current="page"{% endif %}>
+    <a class="{% if mob_active == endpoint %}selected{% endif %}" href="{{ url_for(endpoint) }}"{% if mob_active == endpoint %} aria-current="page"{% endif %}>
       <span class="bottom-icon">
         {{ icon(glyph, 19) }}
-        {% if endpoint == 'campus' and unpaid_count %}<i class="warn"></i>{% elif endpoint == 'staff_dashboard' and pending_staff %}<i class="warn"></i>{% endif %}
+        {% if endpoint == 'finance' and unpaid_count %}<i class="warn"></i>{% elif endpoint == 'staff_dashboard' and pending_staff %}<i class="warn"></i>{% endif %}
       </span>
       <span>{{ short_label }}</span>
     </a>
@@ -129,7 +122,7 @@
     <div class="cmd-shell">
       <div class="cmd-header">
         {{ icon('search', 18) }}
-        <input type="search" id="cmd-input" class="cmd-input" placeholder="Предмет, аудитория, военкомат, общежитие, ПГАС…" autocomplete="off">
+        <input type="search" id="cmd-input" class="cmd-input" placeholder="Предмет, аудитория, справка, стипендия, переговорная…" autocomplete="off" aria-label="Поиск по кабинету">
         <button type="button" class="icon-btn" data-close-dialog aria-label="Закрыть поиск">{{ icon('close', 17) }}</button>
       </div>
       <div class="cmd-results" id="cmd-results">
@@ -144,7 +137,7 @@
         </a>
         {% endfor %}
       </div>
-      <p class="cmd-empty" id="cmd-empty" hidden>Совпадений нет. Спросите ассистента по регламентам в разделе «Спроси деканат».</p>
+      <p class="cmd-empty" id="cmd-empty" hidden>Совпадений нет. Спросите ассистента «Спроси деканат» — кнопка чата в правом нижнем углу.</p>
     </div>
   </dialog>
 
@@ -168,6 +161,45 @@
       </div>
     </div>
   </dialog>
+
+  {% if not is_staff and request.endpoint != 'assistant_view' %}
+  <a class="chat-fab" href="{{ url_for('assistant_view') }}" data-open-chat aria-label="Спроси деканат — ассистент «Семестр»" aria-haspopup="dialog">
+    {{ icon('message', 21) }}<span class="chat-fab-label">Спроси деканат</span>
+  </a>
+  <dialog class="chat-dialog" id="chat-panel" aria-labelledby="chat-title">
+    <div class="chat-shell">
+      <header class="chat-head">
+        {{ mark() }}
+        <div class="chat-head-copy">
+          <strong id="chat-title">Спроси деканат</strong>
+          <small>Ассистент «Семестр» · по регламентам и вашему профилю</small>
+        </div>
+        <a class="icon-btn" href="{{ url_for('assistant_view') }}" aria-label="Открыть чат на всю страницу" title="На всю страницу">{{ icon('up-right', 17) }}</a>
+        <button type="button" class="icon-btn" data-close-dialog aria-label="Закрыть чат">{{ icon('close', 17) }}</button>
+      </header>
+      <div class="chat-feed" id="chat-feed" aria-live="polite">
+        <div class="chat-msg bot chat-greeting">
+          <p>Здравствуйте, {{ g.student.name.split()[0] }}! Помогу найти нужную форму или ответ в положениях. Выберите тему ниже или напишите вопрос своими словами.</p>
+        </div>
+        {% for msg in chat_turns %}{% include '_chat_turn.html' %}{% endfor %}
+        <div class="chat-msg bot chat-typing" id="chat-typing" hidden><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="sr-only">Ассистент печатает</span></div>
+      </div>
+      <form method="post" action="{{ url_for('assistant_ask') }}" class="chat-quick" data-chat-form aria-label="Быстрые темы">
+        {{ csrf_field(csrf) }}
+        {% for p in quick_prompts %}
+        <button type="submit" name="question" value="{{ p }}" class="quick-chip">{{ p }}</button>
+        {% endfor %}
+      </form>
+      <form method="post" action="{{ url_for('assistant_ask') }}" class="chat-composer" data-chat-form>
+        {{ csrf_field(csrf) }}
+        <input type="text" name="question" maxlength="500" minlength="2" required autocomplete="off" placeholder="Например: как оплатить общежитие?" aria-label="Вопрос ассистенту">
+        <button type="submit" class="chat-send" aria-label="Отправить вопрос">{{ icon('send', 17) }}</button>
+      </form>
+      <p class="chat-error" id="chat-error" role="alert" hidden></p>
+      <p class="chat-note">Ассистент не выполняет действий сам и не видит чужих данных. Каждый ответ — со ссылкой на пункт регламента.</p>
+    </div>
+  </dialog>
+  {% endif %}
   {% endif %}
 </body>
 </html>
