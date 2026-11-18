@@ -38,7 +38,11 @@ def decode_rendered_qr(html, index=0):
     for x_s, y_s, w_s in re.findall(r"M(\d+) (\d+)h(\d+)v1h-\d+z", path_d):
         x, y, w = int(x_s), int(y_s), int(w_s)
         canvas[y * scale:(y + 1) * scale, x * scale:(x + w) * scale] = 0
-    decoded, _, _ = cv2.QRCodeDetector().detectAndDecode(canvas)
+    decoded = ""
+    if hasattr(cv2, "QRCodeDetectorAruco"):
+        decoded, _, _ = cv2.QRCodeDetectorAruco().detectAndDecode(canvas)
+    if not decoded:
+        decoded, _, _ = cv2.QRCodeDetector().detectAndDecode(canvas)
     return decoded
 
 
