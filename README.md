@@ -68,6 +68,6 @@ python -m unittest discover -s tests -v
 - Пароли хранятся только как `scrypt`-хэши; `HttpOnly` + `Secure` + `SameSite=Lax` cookie хранит случайный токен, в БД лежит его `SHA-256` хэш с отзывом при выходе.
 - Rate-limit на `/login`: максимум 5 неудачных попыток за 10 минут на `(email, IP)` (`HTTP 429`).
 - Строгий `Content-Security-Policy: default-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` (ноль inline-стилей и inline-скриптов), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, CSRF-токены и защита от IDOR (`404` на чужих ресурсах и `/staff`).
-- Самохостируемые шрифты: `Adwaita Sans` (`LICENSE-ADWAITA.txt`, SIL OFL 1.1) и `JetBrains Mono` (`OFL-JetBrainsMono.txt`, SIL OFL 1.1).
+- Самохостируемые открытые шрифты (SIL OFL 1.1): `Inter Display` (`OFL-InterDisplay.txt`), `Adwaita Sans` (`LICENSE-ADWAITA.txt`) и `JetBrains Mono` (`OFL-JetBrainsMono.txt`).
 - Векторные иконки: `Tabler Icons` (`LICENSE-TABLER.txt`, MIT License).
 - Иллюстрация модернистского корпуса (`campus.webp` только на `/login`) сгенерирована специально для концепта без логотипов и реальных зданий вуза.

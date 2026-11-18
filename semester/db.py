@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS requests (
     UNIQUE(student_id, nonce)
 );
 CREATE INDEX IF NOT EXISTS requests_by_owner ON requests(student_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS requests_by_token ON requests(verify_token);
 CREATE TABLE IF NOT EXISTS staff_notices (
     id TEXT PRIMARY KEY,
     target_group TEXT NOT NULL,
@@ -187,6 +186,7 @@ def _ensure_columns(db):
     missing_tokens = db.execute("SELECT id FROM requests WHERE verify_token = ''").fetchall()
     for r in missing_tokens:
         db.execute("UPDATE requests SET verify_token = ? WHERE id = ?", (secrets.token_urlsafe(16), r["id"]))
+    db.commit()
 
 
 def _sync_student_profiles(db):

@@ -88,3 +88,29 @@ def test_templates_do_not_hardcode_military_for_everyone():
     for name in ("home.html", "base.html", "requests.html", "finance.html", "dorm.html"):
         text = (root / name).read_text(encoding="utf-8")
         assert not re.search(r"военкомат", text, re.I), name
+
+
+def test_login_cards_and_local_demo_accounts_match_student_courses(tmp_path):
+    from pathlib import Path
+    from semester import LOCAL_DEMO_ACCOUNTS, create_app
+
+    by_email = {row[1]: row for row in students()}
+    for acc in LOCAL_DEMO_ACCOUNTS:
+        if acc["email"] in by_email:
+            expected_course = by_email[acc["email"]][6]
+            assert f"{expected_course} курс" in acc["track"], acc
+
+    login_tpl = (Path(__file__).resolve().parents[1] / "semester" / "templates" / "login.html").read_text(encoding="utf-8")
+    assert "lera@demo.example · Маркетинг, 3 курс" in login_tpl
+    assert "misha@demo.example · МО, 4 курс" in login_tpl
+
+    app = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "font-check-secret-0123456789",
+        "DATABASE": str(tmp_path / "font_check.sqlite3"),
+    })
+    client = app.test_client()
+    for fname in ("InterDisplay-SemiBold.woff2", "InterDisplay-Bold.woff2", "OFL-InterDisplay.txt"):
+        r = client.get(f"/static/{fname}")
+        assert r.status_code == 200, fname
+        r.close()

@@ -24,7 +24,7 @@
     <div class="assistant-guardrail-copy">
       <span class="row-glyph">{{ icon('spark', 18) }}</span>
       <div>
-        <strong>Контроль цитирования без домыслов</strong>
+        <strong>Ответы строго по положениям вуза</strong>
         <p>Ассистент ищет релевантные статьи по {{ clause_total }} пунктам положений и оставляет только подтверждённые ссылки вида <span class="num">[П. X.Y]</span>. Если нормы в базе нет — прямо сообщает об этом и даёт переход в учебный офис.</p>
       </div>
     </div>
@@ -61,7 +61,7 @@
         <div class="assistant-reply-head">
           <span class="assistant-author">
             <span class="row-glyph">{{ icon('spark', 16) }}</span>
-            <strong>Справочный контур деканата</strong>
+            <strong>Ассистент деканата · Семестр</strong>
           </span>
           {{ state_badge(msg.mode_label, 'ok' if msg.found else 'warn') }}
         </div>
@@ -114,7 +114,7 @@
     {% else %}
     <div class="surface detail-panel assistant-empty">
       <strong>Задайте вопрос своими словами</strong>
-      <p>Например: «можно ли взять академ на 2 курсе?», «как перевестись на бюджет?», «сколько дней на подачу 095/у после болезни?» или «что будет за просрочку оплаты общежития?».</p>
+      <p>Например: «можно ли взять академ на 3 курсе?», «как перевестись на бюджет?», «сколько дней на подачу 095/у после болезни?» или «что будет за просрочку оплаты общежития?».</p>
     </div>
     {% endfor %}
 

@@ -12,8 +12,8 @@
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='12') }}">
-  <script defer src="{{ url_for('static', filename='portal.js', v='12') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='portal.css', v='13') }}">
+  <script defer src="{{ url_for('static', filename='portal.js', v='13') }}"></script>
 </head>
 <body class="{{ 'signed-in' if g.student else 'signed-out' }}">
   <a class="skip-link" href="#content">К содержимому</a>
@@ -99,7 +99,7 @@
     {% if g.student %}
     <footer class="app-footer" role="contentinfo">
       <span>{{ concept_notice }}</span>
-      <span class="num">Семестр · демо-контур</span>
+      <span class="num">Семестр · учебный прототип</span>
     </footer>
     {% endif %}
   </main>

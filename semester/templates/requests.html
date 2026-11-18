@@ -28,7 +28,7 @@
         <form method="post" action="{{ url_for('request_instant', kind=kind) }}">
           {{ csrf_field(csrf) }}
           <input type="hidden" name="nonce" value="{{ instant_nonce }}">
-          <button type="submit" class="btn btn-ghost compact"><span>Получить PDF</span>{{ icon('arrow', 14) }}</button>
+          <button type="submit" class="btn btn-ghost compact"><span>Выпустить с QR</span>{{ icon('arrow', 14) }}</button>
         </form>
         <a class="text-link" href="{{ url_for('request_new', kind=kind) }}">Оригинал в А–116</a>
       </div>
