@@ -4,7 +4,7 @@
 #   ./deploy.sh [user@host]
 set -euo pipefail
 
-REMOTE="${1:-deploy@136.234.232.127}"
+REMOTE="${1:-${SEMESTER_REMOTE:-deploy@semestr.iamcp.ru}}"
 SSH_KEY="${SEMESTER_SSH_KEY:-$HOME/.ssh/id_ed25519}"
 APP_DIR="${SEMESTER_APP_DIR:-/opt/semestr}"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
