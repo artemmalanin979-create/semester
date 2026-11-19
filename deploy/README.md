@@ -32,3 +32,13 @@ ssh root@<IP_СЕРВЕРА> "bash /opt/semester/deploy/bootstrap.sh"
 
 ## Внешний мониторинг доступности
 Добавьте HTTP-проверку `GET https://<домен>/healthz` (ожидаемый код `200`, тело `ok`, интервал 5 минут) в **Yandex Cloud Monitoring** или **UptimeRobot**, чтобы получать мгновенное уведомление в Telegram/почту до окончания работы жюри (28 ноября 2026).
+
+## Автоматический сброс демо-данных (каждые 45 минут)
+
+На демонстрационном стенде включён таймер `semester-reset-demo.timer` (`deploy/reset-demo.sh`), который каждые **45 минут** вызывает `flask --app semester reset-demo`. Команда возвращает демонстрационные счета, заявки и расписание к эталонному сид-состоянию для следующего члена жюри, сохраняя `password_hash` и активные неистёкшие `login_sessions`.
+
+Ручной сброс на сервере:
+
+```bash
+cd /opt/semestr && docker compose exec -T app flask --app semester reset-demo
+```
