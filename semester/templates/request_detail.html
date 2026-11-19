@@ -90,7 +90,8 @@
         {% elif item.delivery == 'office' %}
           <p class="callout">{{ icon('pin', 18) }}<span>Бумажный оригинал готов к выдаче в окне <strong>А–116</strong> (Корпус А, 1 этаж) по будням с 10:00 до 17:00.</span></p>
         {% else %}
-          <a class="btn btn-primary" href="{{ url_for('request_document', request_id=item.id) }}"><span>Открыть документ</span>{{ icon('arrow', 16) }}</a>
+          <a class="btn btn-primary" href="{{ url_for('request_document', request_id=item.id) }}"><span>Открыть бланк с QR</span>{{ icon('arrow', 16) }}</a>
+          <a class="btn btn-ghost" href="{{ url_for('request_document_pdf', request_id=item.id) }}">{{ icon('download', 16) }}<span>Скачать PDF</span></a>
         {% endif %}
       {% else %}
         <a class="btn btn-ghost" data-refresh-seconds="{{ item.remaining }}" href="{{ url_for('request_detail', request_id=item.id) }}">{{ icon('refresh', 16) }}<span>Обновить статус</span></a>

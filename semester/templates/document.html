@@ -14,7 +14,8 @@
       <button type="submit" class="btn btn-ghost compact">{{ icon('close', 14) }}<span>Отозвать</span></button>
     </form>
     {% endif %}
-    <button type="button" class="btn btn-primary compact" data-print hidden>{{ icon('print', 16) }}<span>Печать / PDF</span></button>
+    <button type="button" class="btn btn-ghost compact" data-print hidden>{{ icon('print', 16) }}<span>Печать</span></button>
+    <a class="btn btn-primary compact" href="{{ url_for('request_document_pdf', request_id=item.id) }}">{{ icon('download', 15) }}<span>Скачать PDF</span></a>
   </div>
 </div>
 

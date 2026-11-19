@@ -633,5 +633,33 @@ class PortalTest(unittest.TestCase):
         self.assertIn('data-tip="Показать пароль"', login_html)
 
 
+    def test_certificate_pdf_download_contains_verify_url_and_enforces_privacy(self):
+        self.login()
+        for kind in ("study", "grades", "income", "dorm_cert"):
+            reqs_page = self.browser.get("/requests")
+            issued = self.browser.post(f"/requests/instant/{kind}", data={
+                "_csrf": token(reqs_page),
+                "nonce": token(reqs_page, "nonce"),
+            })
+            doc_path = urlsplit(issued.location).path
+            doc_html = self.browser.get(doc_path).get_data(as_text=True)
+            self.assertIn("Скачать PDF", doc_html)
+            self.assertIn(doc_path + ".pdf", doc_html)
+
+            pdf_res = self.browser.get(doc_path + ".pdf")
+            self.assertEqual(pdf_res.status_code, 200)
+            self.assertEqual(pdf_res.mimetype, "application/pdf")
+            self.assertIn("attachment; filename=", pdf_res.headers.get("Content-Disposition", ""))
+            self.assertTrue(pdf_res.data.startswith(b"%PDF-"))
+            # Uncompressed PDF stream contains the public /verify/<token> link
+            self.assertRegex(pdf_res.data.decode("latin1"), r"http://localhost/verify/[A-Za-z0-9_-]+")
+
+            # Other student and anonymous user get 404/redirect
+            other = self.app.test_client()
+            self.login(other, 1)
+            self.assertEqual(other.get(doc_path + ".pdf").status_code, 404)
+            anon = self.app.test_client()
+            self.assertEqual(urlsplit(anon.get(doc_path + ".pdf").location).path, "/login")
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import close_db, get_db, initialize, reset_demo_data, session_hash
+from .pdf import render_certificate_pdf
 from .rag import answer_question, classify_gap_topic, sanitize_gap_question, tokenize_ru
 
 from .rules import CLAUSE_BY_ID, CLAUSES, DOCUMENTS
@@ -1384,11 +1385,7 @@ def create_app(config=None):
             return guard
         return render_template("request_detail.html", active="requests_list", item=owned_request(request_id))
 
-    @app.get("/requests/<request_id>/document")
-    def request_document(request_id):
-        guard = require_student()
-        if guard:
-            return guard
+    def _certificate_payload(request_id):
         item = owned_request(request_id)
         if not item["ready"] or item["returned"] or item["rejected"] or item["delivery"] != "digital" or item["kind"] not in INSTANT_TYPES:
             abort(404)
@@ -1401,9 +1398,7 @@ def create_app(config=None):
         verify_code = f"SM-{item['id'][:4].upper()}-{item['id'][4:8].upper()}"
         valid_days = 30 if item["kind"] == "military" else 90
         valid_until = fmt_date(timestamp_day(item["ready_at"] + valid_days * 86400))
-        return render_template(
-            "document.html",
-            active="requests_list",
+        return dict(
             item=item,
             records=records,
             scholar=scholar,
@@ -1412,6 +1407,39 @@ def create_app(config=None):
             verify_code=verify_code,
             verify_url=verify_url,
             valid_until=valid_until,
+        )
+
+    @app.get("/requests/<request_id>/document")
+    def request_document(request_id):
+        guard = require_student()
+        if guard:
+            return guard
+        ctx = _certificate_payload(request_id)
+        return render_template("document.html", active="requests_list", **ctx)
+
+    @app.get("/requests/<request_id>/document.pdf")
+    def request_document_pdf(request_id):
+        guard = require_student()
+        if guard:
+            return guard
+        ctx = _certificate_payload(request_id)
+        pdf_bytes = render_certificate_pdf(
+            item=ctx["item"],
+            student=g.student,
+            student_meta=STUDENT_PROFILES[g.student["id"]],
+            records=ctx["records"],
+            scholar=ctx["scholar"],
+            dorm=ctx["dorm"],
+            verify_code=ctx["verify_code"],
+            verify_url=ctx["verify_url"],
+            valid_until=ctx["valid_until"],
+            concept_notice=CONCEPT_NOTICE,
+        )
+        fname = f"semester-{ctx['item']['kind']}-{ctx['verify_code'].lower()}.pdf"
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{fname}"'},
         )
 
     @app.get("/verify/<token>")
