@@ -133,6 +133,7 @@ LOCAL_DEMO_ACCOUNTS = (
         "name": "Валерия Маякова",
         "group": "МП-24-1",
         "track": "Маркетинг · 3 курс",
+        "subtitle": "lera@demo.example · Маркетинг, 3 курс",
         "email": "lera@demo.example",
         "password": "Semestr-Lera-26",
     },
@@ -140,13 +141,15 @@ LOCAL_DEMO_ACCOUNTS = (
         "name": "Михаил Ратников",
         "group": "МО-23-2",
         "track": "Международные отношения · 4 курс",
+        "subtitle": "misha@demo.example · МО, 4 курс",
         "email": "misha@demo.example",
         "password": "Semestr-Misha-26",
     },
     {
         "name": "Елена Орлова",
-        "group": "Деканат",
+        "group": "А–116",
         "track": "Учебный офис · окно А–116",
+        "subtitle": "dean@demo.example · Учебный офис",
         "email": "dean@demo.example",
         "password": "Semestr-Dean-26",
     },
@@ -211,6 +214,13 @@ def create_app(config=None):
         ),
     )
     is_local_demo = bool(local and not any(raw_passwords))
+    active_demo_accounts = tuple(
+        {
+            **acc,
+            "password": (raw_pw if raw_pw else (acc["password"] if local else "")),
+        }
+        for acc, raw_pw in zip(LOCAL_DEMO_ACCOUNTS, raw_passwords, strict=True)
+    )
     initialize(app.config["DATABASE"], password_hashes)
     app.teardown_appcontext(close_db)
 
@@ -650,7 +660,7 @@ def create_app(config=None):
             delivery=DELIVERY,
             unread_count=unread_count,
             is_local_demo=is_local_demo,
-            demo_accounts=LOCAL_DEMO_ACCOUNTS if is_local_demo else (),
+            demo_accounts=active_demo_accounts,
             student_meta=student_meta,
             pass_qr=pass_qr,
             week_num=academic_week_number(g.stamp.date()) if signed else 1,

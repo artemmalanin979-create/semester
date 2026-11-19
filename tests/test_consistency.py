@@ -100,9 +100,19 @@ def test_login_cards_and_local_demo_accounts_match_student_courses(tmp_path):
             expected_course = by_email[acc["email"]][6]
             assert f"{expected_course} курс" in acc["track"], acc
 
-    login_tpl = (Path(__file__).resolve().parents[1] / "semester" / "templates" / "login.html").read_text(encoding="utf-8")
-    assert "lera@demo.example · Маркетинг, 3 курс" in login_tpl
-    assert "misha@demo.example · МО, 4 курс" in login_tpl
+    prod_app = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "prod-check-secret-01234567890123456789",
+        "DATABASE": str(tmp_path / "prod_login.sqlite3"),
+        "DEMO_PASSWORDS": ("DemoPass-Lera-26", "DemoPass-Misha-26", "DemoPass-Dean-26"),
+    })
+    login_html = prod_app.test_client().get("/login").get_data(as_text=True)
+    assert "lera@demo.example · Маркетинг, 3 курс" in login_html
+    assert "misha@demo.example · МО, 4 курс" in login_html
+    assert 'data-demo-password="DemoPass-Lera-26"' in login_html
+    assert 'data-demo-password="DemoPass-Misha-26"' in login_html
+    assert 'data-demo-password="DemoPass-Dean-26"' in login_html
+    assert "автоматически сбрасываются каждые 45 минут" in login_html
 
     app = create_app({
         "TESTING": True,

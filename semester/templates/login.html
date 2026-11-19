@@ -43,56 +43,24 @@
         <button type="submit" class="btn btn-primary btn-full">Войти</button>
       </form>
 
-      {% if demo_accounts %}
       <section class="demo-switcher" aria-labelledby="demo-heading">
         <div class="demo-switcher-head">
-          <span id="demo-heading">Тестовые профили</span>
-          <small>заполнение в 1 клик</small>
+          <span id="demo-heading">Вымышленные демо-профили</span>
+          <small>почта и пароль в 1 клик</small>
         </div>
         <div class="boxed-list demo-cards">
           {% for acc in demo_accounts %}
-          <button type="button" class="demo-account-btn" data-demo-email="{{ acc.email }}" data-demo-password="{{ acc.password }}" aria-label="Подставить профиль {{ acc.name }}">
+          <button type="button" class="demo-account-btn" data-demo-email="{{ acc.email }}"{% if acc.password %} data-demo-password="{{ acc.password }}"{% endif %} aria-label="Подставить профиль {{ acc.name }}">
             <span class="demo-account-copy">
               <strong>{{ acc.name }}</strong>
-              <small>{{ acc.track }}</small>
+              <small class="num">{{ acc.subtitle }}</small>
             </span>
             <span class="num demo-code">{{ acc.group }}</span>
           </button>
           {% endfor %}
         </div>
+        <p class="demo-prod-hint">Нажмите на карточку, чтобы подставить логин и пароль. Демо-данные на стенде автоматически сбрасываются каждые 45 минут (активные сессии сохраняются).</p>
       </section>
-      {% else %}
-      <section class="demo-switcher" aria-labelledby="demo-heading-prod">
-        <div class="demo-switcher-head">
-          <span id="demo-heading-prod">Тестовые логины стенда</span>
-          <small>подстановка почты</small>
-        </div>
-        <div class="boxed-list demo-cards">
-          <button type="button" class="demo-account-btn" data-demo-email="lera@demo.example" aria-label="Подставить почту Валерии Маяковой">
-            <span class="demo-account-copy">
-              <strong>Валерия Маякова</strong>
-              <small class="num">lera@demo.example · Маркетинг, 3 курс</small>
-            </span>
-            <span class="num demo-code">МП-24-1</span>
-          </button>
-          <button type="button" class="demo-account-btn" data-demo-email="misha@demo.example" aria-label="Подставить почту Михаила Ратникова">
-            <span class="demo-account-copy">
-              <strong>Михаил Ратников</strong>
-              <small class="num">misha@demo.example · МО, 4 курс</small>
-            </span>
-            <span class="num demo-code">МО-23-2</span>
-          </button>
-          <button type="button" class="demo-account-btn" data-demo-email="dean@demo.example" aria-label="Подставить почту учебного офиса">
-            <span class="demo-account-copy">
-              <strong>Елена Орлова</strong>
-              <small class="num">dean@demo.example · Учебный офис</small>
-            </span>
-            <span class="num demo-code">А–116</span>
-          </button>
-        </div>
-        <p class="demo-prod-hint">Нажмите на профиль для подстановки почты — пароль указан в карточке работы для жюри.</p>
-      </section>
-      {% endif %}
     </section>
 
     <footer class="login-footer" role="contentinfo">

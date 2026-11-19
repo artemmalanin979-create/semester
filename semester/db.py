@@ -302,6 +302,8 @@ def reset_demo_data(db):
         for tbl in mutable_tables:
             if tbl in existing_tables:
                 db.execute(f"DELETE FROM {tbl}")
+        if "login_sessions" in existing_tables:
+            db.execute("DELETE FROM login_sessions WHERE expires_at <= ?", (stamp,))
         _seed_requests(db, stamp)
         _seed_charges(db, stamp)
         _seed_gaps(db, stamp)

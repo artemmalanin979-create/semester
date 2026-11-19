@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Semester soft demo reset every 45 minutes
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=45min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

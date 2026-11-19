@@ -74,7 +74,7 @@ fi
 echo "[4/5] Сборка и запуск контейнеров Docker Compose..."
 docker compose up -d --build
 
-echo "[5/5] Регистрация ежедневного бэкапа SQLite и 5-минутного мониторинга /healthz..."
+echo "[5/5] Регистрация бэкапа SQLite, мониторинга /healthz и systemd-таймера мягкого reset-demo (каждые 45 мин)..."
 cat > /etc/cron.d/semester-ops <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
@@ -82,6 +82,11 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 */5 * * * * root SEMESTER_APP_DIR=${APP_DIR} ${APP_DIR}/deploy/uptime-check.sh
 EOF
 chmod 0644 /etc/cron.d/semester-ops
+
+install -m 0644 "${APP_DIR}/deploy/semester-reset-demo.service" /etc/systemd/system/semester-reset-demo.service
+install -m 0644 "${APP_DIR}/deploy/semester-reset-demo.timer" /etc/systemd/system/semester-reset-demo.timer
+systemctl daemon-reload
+systemctl enable --now semester-reset-demo.timer
 
 # Первый контрольный снимок базы и проверка здоровья
 SEMESTER_APP_DIR="${APP_DIR}" "${APP_DIR}/deploy/backup-sqlite.sh"

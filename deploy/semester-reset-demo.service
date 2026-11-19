@@ -1,0 +1,9 @@
+[Unit]
+Description=Soft reset of Semester demo database (preserves password hashes and active sessions)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=SEMESTER_APP_DIR=/opt/semestr
+ExecStart=/opt/semestr/deploy/reset-demo.sh
