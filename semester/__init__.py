@@ -391,7 +391,7 @@ def create_app(config=None):
     def owned_charges(student_id=None):
         sid = student_id or g.student["id"]
         rows = get_db().execute(
-            "SELECT * FROM charges WHERE student_id = ? ORDER BY (status = 'unpaid') DESC, rowid ASC",
+            "SELECT * FROM charges WHERE student_id = ? ORDER BY (status != 'paid') DESC, rowid ASC",
             (sid,),
         ).fetchall()
         return [dict(row) for row in rows]
@@ -614,7 +614,7 @@ def create_app(config=None):
         gaps_staff = 0
         if signed and not staff:
             unpaid_count = get_db().execute(
-                "SELECT COUNT(*) AS c FROM charges WHERE student_id = ? AND status = 'unpaid'",
+                "SELECT COUNT(*) AS c FROM charges WHERE student_id = ? AND status != 'paid'",
                 (g.student["id"],),
             ).fetchone()["c"]
         elif signed and staff:
@@ -766,7 +766,7 @@ def create_app(config=None):
         gaps = day_gaps(agenda, has_ready_office_doc())
         snap = rating_snapshot()
         charges = owned_charges()
-        unpaid = [c for c in charges if c["status"] == "unpaid"]
+        unpaid = [c for c in charges if c["status"] != "paid"]
         window = next(((lid, gap) for lid, gap in gaps.items() if gap.get("book_slot")), None)
         booked_slots = {
             (r["booking_date"], r["slot_label"]): dict(r)
@@ -810,7 +810,7 @@ def create_app(config=None):
         dorm = DORM_INFO.get(sid) if rules["dorm"] else None
         scholar = SCHOLARSHIPS.get(sid) if rules["scholarship"] else None
         profile = STUDENT_PROFILES[sid]
-        unpaid_dorm = next((c for c in charges if c["status"] == "unpaid" and c["category"] == "Общежитие"), None)
+        unpaid_dorm = next((c for c in charges if c["status"] != "paid" and c["category"] == "Общежитие"), None)
         nxt = snap["upcoming"][0] if snap["upcoming"] else None
         other_markers = (
             ("миш", "михаил", "ратников", "орлов", "misha@")
@@ -830,7 +830,7 @@ def create_app(config=None):
                 {"title": nxt["title"], "date": fmt_date(nxt["date"]), "score": nxt["score"]}
                 if nxt else None
             ),
-            "unpaid_rub": sum(c["amount"] for c in charges if c["status"] == "unpaid"),
+            "unpaid_rub": sum(c["amount"] for c in charges if c["status"] != "paid"),
             "scholar_monthly": fmt_rub(scholar["total_monthly"]) if scholar else "0 ₽",
             "scholar_next": scholar["next_date"] if scholar else "—",
             "dorm_building": dorm["building"] if dorm else "",
@@ -1634,7 +1634,7 @@ def create_app(config=None):
             funding=STUDENT_PROFILES[sid]["funding"],
             dorm=DORM_INFO.get(sid) if rules["dorm"] else None,
             dorm_charges=dorm_charges,
-            dorm_unpaid=sum(c["amount"] for c in dorm_charges if c["status"] == "unpaid"),
+            dorm_unpaid=sum(c["amount"] for c in dorm_charges if c["status"] != "paid"),
             other_charges=other_charges,
             receipts=[c for c in charges if c["status"] == "paid"],
             instant_nonce=secrets.token_hex(16),
@@ -1664,7 +1664,7 @@ def create_app(config=None):
             passes.append(entry)
         dorm_info = DORM_INFO.get(sid) if rules["dorm"] else None
         unpaid_dorm = next(
-            (c for c in owned_charges() if c["category"] == "Общежитие" and c["status"] == "unpaid"), None
+            (c for c in owned_charges() if c["category"] == "Общежитие" and c["status"] != "paid"), None
         )
         return render_template(
             "dorm.html",
@@ -1715,6 +1715,99 @@ def create_app(config=None):
         if guard:
             return guard
         return render_template("more.html", active="more")
+
+    @app.post("/campus/sbp/<charge_id>/start")
+    def campus_sbp_start(charge_id):
+        guard = require_student()
+        if guard:
+            return guard
+        db = get_db()
+        row = db.execute(
+            "SELECT * FROM charges WHERE id = ? AND student_id = ?",
+            (charge_id, g.student["id"]),
+        ).fetchone()
+        if not row:
+            abort(404)
+        if row["status"] == "paid":
+            return redirect(url_for("campus_receipt", charge_id=charge_id), code=303)
+        sbp_ref = row["receipt_code"] if row["receipt_code"].startswith("SBP-") else f"SBP-{secrets.token_hex(3).upper()}"
+        with db:
+            db.execute(
+                """UPDATE charges
+                   SET status = 'created', payment_method = 'СБП · 0 %', receipt_code = ?
+                   WHERE id = ? AND student_id = ?""",
+                (sbp_ref, charge_id, g.student["id"]),
+            )
+        return redirect(url_for("campus_sbp_checkout", charge_id=charge_id), code=303)
+
+    @app.get("/campus/sbp/<charge_id>")
+    def campus_sbp_checkout(charge_id):
+        guard = require_student()
+        if guard:
+            return guard
+        row = get_db().execute(
+            "SELECT * FROM charges WHERE id = ? AND student_id = ?",
+            (charge_id, g.student["id"]),
+        ).fetchone()
+        if not row:
+            abort(404)
+        charge = dict(row)
+        sbp_ref = charge["receipt_code"] or f"SBP-{charge['id'][-4:].upper()}"
+        sbp_payload = public_url("campus_sbp_checkout", charge_id=charge_id)
+        return render_template(
+            "sbp_checkout.html",
+            active="finance",
+            charge=charge,
+            sbp_ref=sbp_ref,
+            sbp_qr=qr_svg_path(sbp_payload),
+        )
+
+    @app.post("/campus/sbp/<charge_id>/await")
+    def campus_sbp_await(charge_id):
+        guard = require_student()
+        if guard:
+            return guard
+        db = get_db()
+        row = db.execute(
+            "SELECT * FROM charges WHERE id = ? AND student_id = ?",
+            (charge_id, g.student["id"]),
+        ).fetchone()
+        if not row:
+            abort(404)
+        if row["status"] == "paid":
+            return redirect(url_for("campus_receipt", charge_id=charge_id), code=303)
+        sbp_ref = row["receipt_code"] if row["receipt_code"].startswith("SBP-") else f"SBP-{secrets.token_hex(3).upper()}"
+        with db:
+            db.execute(
+                """UPDATE charges
+                   SET status = 'pending', payment_method = 'СБП · 0 %', receipt_code = ?
+                   WHERE id = ? AND student_id = ?""",
+                (sbp_ref, charge_id, g.student["id"]),
+            )
+        flash("Платёж передан в банк — ожидается подтверждение списания в СБП.")
+        return redirect(url_for("campus_sbp_checkout", charge_id=charge_id), code=303)
+
+    @app.post("/campus/sbp/<charge_id>/cancel")
+    def campus_sbp_cancel(charge_id):
+        guard = require_student()
+        if guard:
+            return guard
+        db = get_db()
+        row = db.execute(
+            "SELECT * FROM charges WHERE id = ? AND student_id = ?",
+            (charge_id, g.student["id"]),
+        ).fetchone()
+        if not row:
+            abort(404)
+        if row["status"] != "paid":
+            with db:
+                db.execute(
+                    "UPDATE charges SET status = 'unpaid', receipt_code = '' WHERE id = ? AND student_id = ?",
+                    (charge_id, g.student["id"]),
+                )
+            flash("Платёжная сессия СБП отменена, счёт возвращён к оплате.")
+        tab = "dorm" if row["category"] == "Общежитие" else "payments"
+        return redirect(url_for("finance", tab=tab), code=303)
 
     @app.post("/campus/pay/<charge_id>")
     def campus_pay(charge_id):
@@ -1955,7 +2048,7 @@ def create_app(config=None):
         all_reqs = db.execute("SELECT ready_at, decision FROM requests").fetchall()
         pending_total = sum((r["ready_at"] > g.epoch and r["decision"] not in ("returned", "rejected")) for r in all_reqs)
         closed_total = len(all_reqs) - pending_total
-        unpaid_total = db.execute("SELECT COUNT(*) AS c FROM charges WHERE status = 'unpaid'").fetchone()["c"]
+        unpaid_total = db.execute("SELECT COUNT(*) AS c FROM charges WHERE status != 'paid'").fetchone()["c"]
         overrides_total = db.execute("SELECT COUNT(*) AS c FROM room_overrides").fetchone()["c"]
         gaps_total = db.execute("SELECT COUNT(*) AS c FROM assistant_gaps").fetchone()["c"]
         return {
@@ -2123,7 +2216,7 @@ def create_app(config=None):
             sid = srow["id"]
             snap = rating_snapshot(sid)
             charges = owned_charges(sid)
-            unpaid_sum = sum(c["amount"] for c in charges if c["status"] == "unpaid")
+            unpaid_sum = sum(c["amount"] for c in charges if c["status"] != "paid")
             open_reqs = db.execute(
                 "SELECT COUNT(*) AS c FROM requests WHERE student_id = ? AND ready_at > ? AND decision NOT IN ('returned', 'rejected')",
                 (sid, g.epoch),

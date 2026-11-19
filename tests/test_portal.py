@@ -661,5 +661,41 @@ class PortalTest(unittest.TestCase):
             anon = self.app.test_client()
             self.assertEqual(urlsplit(anon.get(doc_path + ".pdf").location).path, "/login")
 
+    def test_sbp_three_step_payment_simulation_created_pending_paid(self):
+        self.login()
+        fin = self.browser.get("/finance?tab=dorm")
+        self.assertEqual(fin.status_code, 200)
+
+        # Other student cannot start or read Lera's SBP session
+        other = self.app.test_client()
+        self.login(other, 1)
+        other_fin = other.get("/finance?tab=dorm")
+        self.assertEqual(other.post("/campus/sbp/chg-1-nov/start", data={"_csrf": token(other_fin)}).status_code, 404)
+
+        # Step 1: Created
+        r_create = self.browser.post("/campus/sbp/chg-1-nov/start", data={"_csrf": token(fin)}, follow_redirects=True)
+        self.assertEqual(r_create.status_code, 200)
+        html_c = r_create.get_data(as_text=True)
+        self.assertIn("Счёт создан", html_c)
+        self.assertIn("1. Создан", html_c)
+        self.assertEqual(other.get("/campus/sbp/chg-1-nov").status_code, 404)
+        self.assertIn("Счёт СБП создан", self.browser.get("/finance?tab=dorm").get_data(as_text=True))
+
+        # Step 2: Pending (awaiting bank confirmation)
+        r_wait = self.browser.post("/campus/sbp/chg-1-nov/await", data={"_csrf": token(r_create)}, follow_redirects=True)
+        self.assertEqual(r_wait.status_code, 200)
+        html_w = r_wait.get_data(as_text=True)
+        self.assertIn("Ожидает подтверждения", html_w)
+        self.assertIn("Подтвердить оплату в банке", html_w)
+        self.assertIn("Ожидает в СБП", self.browser.get("/finance?tab=dorm").get_data(as_text=True))
+        # Receipt is still 404 while pending
+        self.assertEqual(self.browser.get("/campus/receipt/chg-1-nov").status_code, 404)
+
+        # Step 3: Paid -> issues official receipt with RCP- code
+        r_paid = self.browser.post("/campus/pay/chg-1-nov", data={"_csrf": token(r_wait), "method": "sbp"}, follow_redirects=True)
+        self.assertEqual(r_paid.status_code, 200)
+        self.assertIn("Подтверждение платежа", r_paid.get_data(as_text=True))
+        self.assertIn("Оплачено", self.browser.get("/finance?tab=dorm").get_data(as_text=True))
+
 if __name__ == "__main__":
     unittest.main()

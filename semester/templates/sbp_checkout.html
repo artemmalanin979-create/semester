@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% from 'components.html' import icon, qr_code, csrf_field, pageheading, state_badge %}
+{% block title %}Оплата СБП · {{ charge.title }} · Семестр{% endblock %}
+{% block content %}
+{% set back_tab = 'dorm' if charge.category == 'Общежитие' else 'payments' %}
+<a class="text-link back-link" href="{{ url_for('finance', tab=back_tab) }}">{{ icon('left', 16) }}<span>К разделу «Финансы»</span></a>
+
+{% set st = charge.status %}
+{% set badge_lbl = 'Оплачен' if st == 'paid' else ('Ожидает подтверждения' if st == 'pending' else 'Счёт создан') %}
+{% set badge_tone = 'ok' if st == 'paid' else 'warn' %}
+{{ pageheading('Система быстрых платежей (демо)', charge.title ~ ' · договор ' ~ charge.contract_no ~ ' · ' ~ charge.period_label) }}
+
+<p class="callout sim-banner">
+  {{ icon('info', 18) }}
+  <span><strong>Демонстрационная симуляция СБП:</strong> реальные банковские реквизиты не задействованы — вы можете пройти все промежуточные статусы платёжного шлюза.</span>
+</p>
+
+<div class="form-split">
+  <section class="surface detail-panel" aria-labelledby="sbp-steps-heading">
+    <div class="detail-head">
+      <div>
+        <h2 id="sbp-steps-heading">Статус операции <span class="num">{{ sbp_ref }}</span></h2>
+        <p class="detail-sub">Сумма к зачислению: <strong class="num">{{ fmt_rub(charge.amount) }}</strong> · комиссия 0 %</p>
+      </div>
+      {{ state_badge(badge_lbl, badge_tone) }}
+    </div>
+
+    <ol class="timeline">
+      <li class="done">
+        <span class="timeline-mark">{{ icon('check', 13) }}</span>
+        <div>
+          <strong>1. Создан</strong>
+          <p>Сформирован платёжный запрос СБП <span class="num">{{ sbp_ref }}</span> на сумму <span class="num">{{ fmt_rub(charge.amount) }}</span>.</p>
+        </div>
+      </li>
+      <li class="{{ 'done' if st == 'paid' else ('current' if st == 'pending' else '') }}">
+        <span class="timeline-mark">{{ icon('check', 13) if st == 'paid' else (icon('clock', 13) if st == 'pending' else '') }}</span>
+        <div>
+          <strong>2. Ожидает</strong>
+          <p>{{ 'Перевод подтверждён плательщиком.' if st == 'paid' else ('Ожидается подтверждение списания в мобильном банке плательщика.' if st == 'pending' else 'Отсканируйте QR-код или переведите операцию в статус ожидания банка.') }}</p>
+        </div>
+      </li>
+      <li class="{{ 'done' if st == 'paid' else '' }}">
+        <span class="timeline-mark">{{ icon('check', 13) if st == 'paid' else '' }}</span>
+        <div>
+          <strong>3. Оплачен</strong>
+          <p>{{ 'Платёж зачислен, выпущена электронная квитанция ' ~ charge.receipt_code ~ '.' if st == 'paid' else 'Автоматическое зачисление и выпуск квитанции после ответа банка.' }}</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="detail-actions">
+      {% if st == 'paid' %}
+        <a class="btn btn-primary" href="{{ url_for('campus_receipt', charge_id=charge.id) }}">{{ icon('file', 16) }}<span>Открыть квитанцию</span></a>
+      {% elif st == 'pending' %}
+        <form method="post" action="{{ url_for('campus_pay', charge_id=charge.id) }}">
+          {{ csrf_field(csrf) }}
+          <input type="hidden" name="method" value="sbp">
+          <button type="submit" class="btn btn-primary">{{ icon('check', 16) }}<span>Подтвердить оплату в банке</span></button>
+        </form>
+        <form method="post" action="{{ url_for('campus_sbp_cancel', charge_id=charge.id) }}">
+          {{ csrf_field(csrf) }}
+          <button type="submit" class="btn btn-ghost"><span>Отменить</span></button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('campus_sbp_await', charge_id=charge.id) }}">
+          {{ csrf_field(csrf) }}
+          <button type="submit" class="btn btn-primary">{{ icon('clock', 16) }}<span>Я отсканировал QR · Ожидать банк</span></button>
+        </form>
+        <form method="post" action="{{ url_for('campus_pay', charge_id=charge.id) }}">
+          {{ csrf_field(csrf) }}
+          <input type="hidden" name="method" value="sbp">
+          <button type="submit" class="btn btn-ghost"><span>Мгновенная оплата</span></button>
+        </form>
+        <form method="post" action="{{ url_for('campus_sbp_cancel', charge_id=charge.id) }}">
+          {{ csrf_field(csrf) }}
+          <button type="submit" class="btn btn-ghost"><span>Отменить</span></button>
+        </form>
+      {% endif %}
+    </div>
+  </section>
+
+  <aside class="surface side-info-card" aria-label="QR-код СБП">
+    <h2 class="side-card-title">Платёжный QR (демо)</h2>
+    <div class="doc-qr">{{ qr_code(sbp_qr, 132) }}</div>
+    <dl class="mini-dl">
+      <div><dt>Получатель</dt><dd>Учебный контур «Семестр»</dd></div>
+      <div><dt>Договор</dt><dd class="num">{{ charge.contract_no }}</dd></div>
+      <div><dt>Сумма</dt><dd class="num">{{ fmt_rub(charge.amount) }}</dd></div>
+    </dl>
+  </aside>
+</div>
+{% endblock %}

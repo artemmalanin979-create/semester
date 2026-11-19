@@ -3967,7 +3967,9 @@ a.box-row:hover .wallet-flap {
     width: 100%;
   }
 
-  .pay-inline-form select {
+  .pay-inline-form select,
+  .pay-inline-form form,
+  .pay-inline-form .btn {
     width: 100%;
   }
 

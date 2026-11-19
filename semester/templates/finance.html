@@ -8,11 +8,12 @@
 {% macro charge_list(items, empty_text) %}
 <div class="surface boxed-list">
   {% for ch in items %}
+  {% set badge_lbl = 'Оплачено' if ch.status == 'paid' else ('Ожидает в СБП' if ch.status == 'pending' else ('Счёт СБП создан' if ch.status == 'created' else 'К оплате')) %}
   <article class="charge-row" id="charge-{{ ch.id }}">
     <div class="charge-info">
       <div class="heading-inline">
         <strong>{{ ch.title }}</strong>
-        {{ state_badge('Оплачено' if ch.status == 'paid' else 'К оплате', 'ok' if ch.status == 'paid' else 'warn') }}
+        {{ state_badge(badge_lbl, 'ok' if ch.status == 'paid' else 'warn') }}
       </div>
       <p class="lesson-meta">
         <span class="num">Договор {{ ch.contract_no }}</span>
@@ -22,18 +23,22 @@
     </div>
     <div class="charge-amount num"><strong>{{ fmt_rub(ch.amount) }}</strong></div>
     <div class="charge-actions">
-      {% if ch.status == 'unpaid' %}
-      <form method="post" action="{{ url_for('campus_pay', charge_id=ch.id) }}" class="pay-inline-form">
-        {{ csrf_field(csrf) }}
-        <label class="sr-only" for="method-{{ ch.id }}">Способ оплаты</label>
-        <select id="method-{{ ch.id }}" name="method">
-          <option value="sbp">СБП · 0 %</option>
-          <option value="mir">Карта «Мир»</option>
-        </select>
-        <button type="submit" class="btn btn-primary compact"><span>Оплатить</span>{{ icon('arrow', 14) }}</button>
-      </form>
-      {% else %}
+      {% if ch.status == 'paid' %}
       <a class="btn btn-ghost compact" href="{{ url_for('campus_receipt', charge_id=ch.id) }}">{{ icon('file', 15) }}<span>Квитанция</span></a>
+      {% elif ch.status in ('created', 'pending') %}
+      <a class="btn btn-primary compact" href="{{ url_for('campus_sbp_checkout', charge_id=ch.id) }}"><span>Продолжить СБП</span>{{ icon('arrow', 14) }}</a>
+      {% else %}
+      <div class="pay-inline-form">
+        <form method="post" action="{{ url_for('campus_sbp_start', charge_id=ch.id) }}">
+          {{ csrf_field(csrf) }}
+          <button type="submit" class="btn btn-primary compact"><span>СБП · 0 %</span>{{ icon('arrow', 14) }}</button>
+        </form>
+        <form method="post" action="{{ url_for('campus_pay', charge_id=ch.id) }}">
+          {{ csrf_field(csrf) }}
+          <input type="hidden" name="method" value="mir">
+          <button type="submit" class="btn btn-ghost compact"><span>Карта «Мир»</span></button>
+        </form>
+      </div>
       {% endif %}
     </div>
   </article>
