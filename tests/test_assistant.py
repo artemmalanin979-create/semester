@@ -486,3 +486,57 @@ def test_floating_chat_panel_present_without_inline_code(env_app):
     staff = app.test_client()
     login_as(staff, 2)
     assert "data-open-chat" not in staff.get("/staff").get_data(as_text=True)
+
+
+def test_chat_prefills_multifield_petition_draft_from_dialog_and_submits(env_app):
+    app, _ = env_app
+    client = app.test_client()
+    login_as(client, 0)
+
+    # Turn 1 provides personal episode details (dates, clinic, missed discipline, office check)
+    ask_chat_json(
+        client,
+        "С 10 по 15 ноября болела, есть выписка ЕМИАС из поликлиники 209, пропустила Экономику фирмы, принесу в окно А-116",
+    )
+    # Turn 2 asks the regulation question -> assistant synthesizes draft from full dialog history
+    resp = ask_chat_json(client, "В какой срок подать медсправку 095/у?")
+    assert resp.status_code == 200
+    chat_html = resp.get_json()["html"]
+    assert "Проверить черновик заявления" in chat_html
+
+    draft_match = re.search(r'href="(/requests/new/medical\?[^"]+)"', chat_html)
+    assert draft_match, chat_html
+    draft_url = draft_match.group(1).replace("&amp;", "&")
+
+    form_page = client.get(draft_url)
+    assert form_page.status_code == 200
+    form_html = form_page.get_data(as_text=True)
+    assert "Черновик заполнен из диалога «Спроси деканат»" in form_html
+    assert 'value="Выписка ЕМИАС / КЭК" selected' in form_html
+    assert "10 по 15 ноября" in form_html
+    assert "поликлиники 209" in form_html
+    assert 'value="office" selected' in form_html
+    assert "Экономика фирмы" in form_html
+
+    # Student reviews and submits immediately without retyping anything
+    nonce_m = re.search(r'name="nonce" value="([^"]+)"', form_html)
+    subj_m = re.search(r'<option value="([^"]+)" selected>', form_html)
+    ref_m = re.search(r'name="period_ref"[^>]*value="([^"]+)"', form_html)
+    comm_m = re.search(r'<textarea[^>]*name="comment"[^>]*>(.*?)</textarea>', form_html, re.DOTALL)
+    submitted = client.post(
+        "/requests/new/medical",
+        data={
+            "_csrf": csrf_token(form_page),
+            "nonce": nonce_m.group(1),
+            "subject": subj_m.group(1),
+            "period_ref": ref_m.group(1),
+            "notify_channel": "office",
+            "comment": comm_m.group(1),
+        },
+        follow_redirects=True,
+    )
+    assert submitted.status_code == 200
+    sub_html = submitted.get_data(as_text=True)
+    assert "Обращение передано в учебный офис." in sub_html
+    assert "Выписка ЕМИАС / КЭК" in sub_html
+    assert "10 по 15 ноября" in sub_html

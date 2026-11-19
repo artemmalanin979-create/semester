@@ -825,6 +825,7 @@ def create_app(config=None):
             "rating_avg": snap["rating_avg"],
             "earned_credits": snap["earned_credits"],
             "total_credits": snap["total_credits"],
+            "disciplines": [r["title"] for r in snap["records"]],
             "next_exam": (
                 {"title": nxt["title"], "date": fmt_date(nxt["date"]), "score": nxt["score"]}
                 if nxt else None
@@ -1302,11 +1303,25 @@ def create_app(config=None):
         if kind not in REQUEST_TYPES or (kind in INSTANT_TYPES and kind not in instant_types_for(g.student["id"])):
             abort(404)
         is_pet = kind in PETITION_TYPES
+        disciplines = [r["title"] for r in academic_results(g.student["id"], g.stamp.date())]
         if request.method != "POST":
             prefill_key = request.args.get("prefill", "")
             prefill_subj, prefill_body = PREFILL_TEMPLATES.get(prefill_key, ("", ""))
+            is_draft = request.args.get("draft") == "1"
+            cite_id = request.args.get("cite", "").strip()[:12]
+            draft_clause = CLAUSE_BY_ID.get(cite_id) if is_draft else None
+            arg_subj = request.args.get("subject", "").strip()[:100]
+            arg_ref = request.args.get("ref", "").strip()[:120]
+            arg_notify = request.args.get("notify", "cabinet")
+            if arg_notify not in {"cabinet", "office"}:
+                arg_notify = "cabinet"
+            arg_comment = request.args.get("comment", "").strip()[:420]
             custom_q = request.args.get("q", "").strip()[:400]
-            if custom_q and not prefill_body:
+            if arg_subj:
+                prefill_subj = arg_subj
+            if arg_comment:
+                prefill_body = arg_comment
+            elif custom_q and not prefill_body:
                 prefill_subj = prefill_subj or "Индивидуальный вопрос по обучению"
                 prefill_body = f"Вопрос в учебный офис: {custom_q}"
             return render_template(
@@ -1314,27 +1329,37 @@ def create_app(config=None):
                 active="requests_list",
                 kind=kind,
                 is_petition=is_pet,
+                is_draft=is_draft,
+                draft_clause=draft_clause,
                 nonce=secrets.token_hex(16),
                 selected="digital",
                 selected_subject=prefill_subj,
+                period_ref=arg_ref,
+                notify_channel=arg_notify,
                 comment=prefill_body,
                 error=None,
-                disciplines=[r["title"] for r in academic_results(g.student["id"], g.stamp.date())],
+                disciplines=disciplines,
             )
         nonce = request.form.get("nonce", "")
         if not TOKEN.fullmatch(nonce):
             abort(400)
         selected = "digital" if is_pet else request.form.get("delivery")
         extra_subject = request.form.get("subject", "").strip()[:100]
+        period_ref = request.form.get("period_ref", "").strip()[:120]
+        notify_channel = request.form.get("notify_channel", "cabinet")
+        if notify_channel not in {"cabinet", "office"}:
+            notify_channel = "cabinet"
         raw_comment = request.form.get("comment", "").strip()
-        comment = f"[{extra_subject}] {raw_comment}".strip() if extra_subject else raw_comment
+        meta_parts = [p for p in (extra_subject, period_ref, "очная консультация А–116" if notify_channel == "office" else "") if p]
+        meta_prefix = f"[{' · '.join(meta_parts)}] " if meta_parts else ""
         error = None
         if selected not in DELIVERY:
             error = "Укажите способ получения."
-        elif len(comment) > 500:
+        elif len(raw_comment) > 500 or (not meta_parts and len(raw_comment) > 500):
             error = "Сократите текст до 500 знаков."
-        elif is_pet and len(comment) < 10:
+        elif is_pet and len(raw_comment) < 10:
             error = "Опишите основание обращения подробнее, минимум 10 знаков."
+        comment = (meta_prefix + raw_comment).strip()[:500]
         if error:
             return (
                 render_template(
@@ -1342,12 +1367,16 @@ def create_app(config=None):
                     active="requests_list",
                     kind=kind,
                     is_petition=is_pet,
+                    is_draft=False,
+                    draft_clause=None,
                     nonce=nonce,
                     selected=selected,
                     selected_subject=extra_subject,
+                    period_ref=period_ref,
+                    notify_channel=notify_channel,
                     comment=raw_comment[:500],
                     error=error,
-                    disciplines=[r["title"] for r in academic_results(g.student["id"], g.stamp.date())],
+                    disciplines=disciplines,
                 ),
                 422,
             )

@@ -6,6 +6,16 @@
 <a class="text-link back-link" href="{{ url_for('requests_list') }}">{{ icon('left', 16) }}<span>Все документы и заявки</span></a>
 {{ pageheading(title, description) }}
 
+{% if is_draft %}
+<p class="callout" role="status">
+  {{ icon('message', 18) }}
+  <span>
+    <strong>Черновик заполнен из диалога «Спроси деканат»</strong>{% if draft_clause %} (основание: <a class="text-link" href="{{ draft_clause.url }}">П. {{ draft_clause.id }}</a>){% endif %}.
+    Проверьте поля ниже и нажмите «Отправить заявку».
+  </span>
+</p>
+{% endif %}
+
 <div class="form-split">
   <form method="post" class="surface detail-panel form-panel">
     {{ csrf_field(csrf) }}
@@ -20,7 +30,7 @@
           <input type="radio" name="delivery" value="digital" required{% if selected == 'digital' %} checked{% endif %}>
           <span class="radio-copy">
             <strong>Электронно в кабинете</strong>
-            <small>Документ с матричным кодом проверки и печатной формой PDF.</small>
+            <small>Документ с матричным кодом проверки и скачиванием PDF.</small>
           </span>
         </label>
         <label class="radio-option">
@@ -39,7 +49,7 @@
       <label for="subject">Дисциплина семестра</label>
       <select id="subject" name="subject">
         {% for disc in disciplines %}
-        <option value="{{ disc }}">{{ disc }}</option>
+        <option value="{{ disc }}"{% if selected_subject == disc %} selected{% endif %}>{{ disc }}</option>
         {% endfor %}
       </select>
     </div>
@@ -47,10 +57,10 @@
     <div class="field-group">
       <label for="subject">Основание выплаты</label>
       <select id="subject" name="subject">
-        <option value="ПГАС · учебная деятельность">ПГАС · учебная деятельность (рейтинг 85+)</option>
-        <option value="ПГАС · научная деятельность">ПГАС · научно-исследовательская деятельность</option>
-        <option value="ПГАС · проектная деятельность">ПГАС · проектная и общественная деятельность</option>
-        <option value="Материальная помощь">Разовая материальная поддержка</option>
+        <option value="ПГАС · учебная деятельность"{% if selected_subject == 'ПГАС · учебная деятельность' %} selected{% endif %}>ПГАС · учебная деятельность (рейтинг 85+)</option>
+        <option value="ПГАС · научная деятельность"{% if selected_subject == 'ПГАС · научная деятельность' %} selected{% endif %}>ПГАС · научно-исследовательская деятельность</option>
+        <option value="ПГАС · проектная деятельность"{% if selected_subject == 'ПГАС · проектная деятельность' %} selected{% endif %}>ПГАС · проектная и общественная деятельность</option>
+        <option value="Материальная помощь"{% if selected_subject == 'Материальная помощь' %} selected{% endif %}>Разовая материальная поддержка</option>
       </select>
     </div>
     {% elif kind == 'medical' %}
@@ -61,16 +71,55 @@
         <option value="Выписка ЕМИАС / КЭК"{% if selected_subject == 'Выписка ЕМИАС / КЭК' %} selected{% endif %}>Электронная выписка поликлиники / заключение КЭК</option>
       </select>
     </div>
-    {% elif kind == 'appeal' and selected_subject %}
-    <input type="hidden" name="subject" value="{{ selected_subject }}">
+    {% elif kind == 'appeal' %}
+    {% set appeal_options = [
+      'Индивидуальный учебный план',
+      'Академический отпуск',
+      'Перевод с платного на бюджет',
+      'Апелляция результатов аттестации',
+      'Объяснительная по пропуску занятия',
+      'Индивидуальный вопрос по обучению'
+    ] %}
+    <div class="field-group">
+      <label for="subject">Тема заявления</label>
+      <select id="subject" name="subject">
+        {% if selected_subject and selected_subject not in appeal_options %}
+        <option value="{{ selected_subject }}" selected>{{ selected_subject }}</option>
+        {% endif %}
+        {% for opt in appeal_options %}
+        <option value="{{ opt }}"{% if selected_subject == opt %} selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    {% if is_petition %}
+    <div class="field-group">
+      <label for="period_ref">
+        {% if kind == 'medical' %}Период освобождения и медучреждение
+        {% elif kind == 'pgas' %}Расчётный семестр и показатель
+        {% elif kind == 'retake' %}Период аттестации / поток
+        {% else %}Учебный период или реквизиты{% endif %}
+        <small>можно уточнить</small>
+      </label>
+      <input type="text" id="period_ref" name="period_ref" maxlength="120" value="{{ period_ref or '' }}" placeholder="{{ 'Например: 12.11–18.11.2026 · поликлиника № 209' if kind == 'medical' else 'Например: Осенний семестр 2026' }}">
+    </div>
+
+    <div class="field-group">
+      <label for="notify_channel">Формат рассмотрения</label>
+      <select id="notify_channel" name="notify_channel">
+        <option value="cabinet"{% if notify_channel != 'office' %} selected{% endif %}>Электронное решение в кабинете и ленте уведомлений</option>
+        <option value="office"{% if notify_channel == 'office' %} selected{% endif %}>Решение в кабинете + очная сверка оригинала в окне А–116</option>
+      </select>
+    </div>
     {% endif %}
 
     <div class="field-group">
       <label for="comment">
-        {% if kind == 'medical' %}Период освобождения и номер медучреждения
+        {% if kind == 'medical' %}Текст заявления и переносимые занятия
         {% elif kind == 'pgas' %}Перечень достижений или основание
-        {% elif kind == 'retake' %}Причина пересдачи или желаемый поток
-        {% elif is_petition %}Текст заявления
+        {% elif kind == 'retake' %}Основание для выдачи экзаменационного листа
+        {% elif is_petition %}Текст и обоснование заявления
         {% else %}Комментарий / место требования <small>необязательно</small>{% endif %}
       </label>
       <textarea name="comment" id="comment" rows="4" maxlength="500" placeholder="{{ 'Укажите детали для методиста учебного офиса (минимум 10 знаков)' if is_petition else 'Например: по месту прохождения стажировки или в отдел кадров' }}"{% if is_petition %} required minlength="10"{% endif %}>{{ comment }}</textarea>

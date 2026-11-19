@@ -611,6 +611,170 @@ def _not_found_payload(clean_q: str, attack: bool = False) -> dict:
     }
 
 
+
+_DATE_SPAN_RE = re.compile(
+    r"((?:с\s+)?\d{1,2}(?:\.\d{1,2}(?:\.\d{2,4})?)?\s*(?:по|–|-|—)\s*\d{1,2}(?:\.\d{1,2}(?:\.\d{2,4})?)?"
+    r"(?:\s+[а-яё]{3,10})?(?:\s+202\d)?"
+    r"|\d{1,2}\s+(?:январ|феврал|март|апрел|ма[яй]|июн|июл|август|сентябр|октябр|ноябр|декабр)[а-яё]*)",
+    re.I,
+)
+_CLINIC_RE = re.compile(r"(поликлиник[а-яё]*\s*(?:№\s*)?\d+|гкб\s*(?:№\s*)?\d+|емиас|кэк)", re.I)
+
+
+def build_petition_draft(
+    clean_q: str,
+    history: list[dict] | tuple[dict, ...],
+    student_ctx: dict,
+    used_clauses: list[dict],
+) -> dict | None:
+    """Synthesize a prefilled multi-field petition draft URL from dialog context and verified clauses."""
+    if not used_clauses:
+        return None
+    user_turns = [
+        h["content"].strip()
+        for h in trim_history(history, max_turns=6)
+        if h.get("role") == "user" and h.get("content") and not is_attack_query(h["content"])
+    ]
+    dialog_text = " ".join([*user_turns[-3:], clean_q]).strip()
+    norm = _normalize_text(dialog_text)
+    clause_ids = [c["id"] for c in used_clauses]
+    primary_id = clause_ids[0]
+    doc_slugs = {c["doc_slug"] for c in used_clauses}
+
+    course = student_ctx.get("course") or 3
+    rating = student_ctx.get("rating_avg") or ""
+    disciplines = list(student_ctx.get("disciplines") or ())
+    matched_disc = ""
+    for d in disciplines:
+        d_words = [w for w in tokenize_ru(d) if len(w) >= 4]
+        if d.lower() in norm or (d_words and all(any(tok.startswith(w[:5]) for tok in tokenize_ru(dialog_text)) for w in d_words[:1])):
+            matched_disc = d
+            break
+
+    date_m = _DATE_SPAN_RE.search(dialog_text)
+    date_hint = date_m.group(1).strip() if date_m else ""
+    clinic_m = _CLINIC_RE.search(dialog_text)
+    clinic_hint = clinic_m.group(1).strip() if clinic_m else ""
+    wants_office = bool(re.search(r"очн|лично|окн[оеа]|а[-–]116|оригинал", norm))
+    notify = "office" if wants_office else "cabinet"
+
+    kind = ""
+    subject = ""
+    ref_val = ""
+    body = ""
+
+    # 1) Medical / excused absence (clauses 2.*)
+    if any(cid.startswith("2.") for cid in clause_ids) or "medical-leave" in doc_slugs or re.search(r"095|болел|медсправк|емиас|кэк|пропуск.*пар", norm):
+        kind = "medical"
+        is_emias = bool(re.search(r"емиас|кэк|выписк", norm))
+        subject = "Выписка ЕМИАС / КЭК" if is_emias else "Форма 095/у"
+        parts_ref = [p for p in (date_hint or "Ноябрь 2026 (уточните даты)", clinic_hint or ("выписка ЕМИАС" if is_emias else "медсправка 095/у")) if p]
+        ref_val = " · ".join(parts_ref)[:110]
+        disc_clause = f" по дисциплине «{matched_disc}»" if matched_disc else ""
+        span_clause = f" за период {date_hint}" if date_hint else ""
+        clinic_clause = f" ({clinic_hint})" if clinic_hint else ""
+        body = (
+            f"Прошу закрыть пропуски занятий по уважительной медицинской причине{span_clause}{clinic_clause} "
+            f"и согласовать перенос контрольной точки{disc_clause} на резервный день согласно П. {primary_id}."
+        )
+
+    # 2) PGAS / material support (clauses 5.3-5.6 or explicit mention)
+    elif any(cid in {"5.3", "5.4", "5.5", "5.6"} for cid in clause_ids) or re.search(r"пгас|повышенн[а-я]*\s+стипенд|матпомощ|материальн[а-я]*\s+помощ", norm):
+        kind = "pgas"
+        if re.search(r"матпомощ|материальн|социальн|трудн", norm):
+            subject = "Материальная помощь"
+            ref_val = f"Осенний семестр 2026 · {course} курс"
+            body = (
+                f"Прошу рассмотреть заявление о назначении разовой материальной поддержки в осеннем семестре "
+                f"на основании П. {primary_id}. Подтверждающие документы обязуюсь предъявить при верификации."
+            )
+        elif re.search(r"науч|стать|конференц|публикац|исслед", norm):
+            subject = "ПГАС · научная деятельность"
+            ref_val = f"Осенний семестр 2026 · рейтинг {rating}" if rating else "Осенний семестр 2026"
+            body = (
+                f"Прошу включить мою анкету в конкурс на повышенную государственную академическую стипендию "
+                f"(номинация: научно-исследовательская деятельность) в соответствии с П. {primary_id}."
+            )
+        elif re.search(r"проект|обществен|волонтер|кейс|мероприят", norm):
+            subject = "ПГАС · проектная деятельность"
+            ref_val = f"Осенний семестр 2026 · рейтинг {rating}" if rating else "Осенний семестр 2026"
+            body = (
+                f"Прошу учесть результаты проектной и общественной деятельности для участия в конкурсе на ПГАС "
+                f"в осеннем семестре согласно П. {primary_id}."
+            )
+        else:
+            subject = "ПГАС · учебная деятельность"
+            ref_val = f"Осенний семестр 2026 · рейтинг {rating}" if rating else "Осенний семестр 2026"
+            body = (
+                f"Прошу включить анкету в конкурс на повышенную государственную академическую стипендию "
+                f"по итогам учебной деятельности (текущий рейтинг {rating}) на основании П. {primary_id}."
+            )
+
+    # 3) Retake / exam sheet ("бегунок", clauses 1.3-1.7)
+    elif any(cid in {"1.3", "1.4", "1.5", "1.6", "1.7"} for cid in clause_ids) or re.search(r"пересдач|бегунок|незачет|неуд|хвост|комисси", norm):
+        kind = "retake"
+        subject = matched_disc or (disciplines[0] if disciplines else "")
+        ref_val = date_hint or "Основной период пересдач · осенний семестр 2026"
+        disc_txt = f" по дисциплине «{subject}»" if subject else ""
+        body = (
+            f"Прошу сформировать электронный экзаменационный лист (направление на пересдачу){disc_txt} "
+            f"в установленный регламентом срок согласно П. {primary_id}."
+        )
+
+    # 4) Appeal / Academic leave / Transfer to budget / IUP (clauses 1.8, 3.*, 4.*, 8.1-8.7)
+    elif (
+        any(cid.startswith(("3.", "4.")) or cid in {"1.8", "8.1", "8.2", "8.3", "8.5", "8.7"} for cid in clause_ids)
+        or re.search(r"академ|бюджет|апелляц|иуп|индивидуальн[а-я]*\s+план|перезачет|факультатив", norm)
+    ):
+        kind = "appeal"
+        if any(cid.startswith("3.") for cid in clause_ids) or "академ" in norm:
+            subject = "Академический отпуск"
+            ref_val = date_hint or f"{course} курс · 2026/2027 учебный год"
+            reason = "по медицинским / семейным основаниям" if not re.search(r"семейн", norm) else "по семейным обстоятельствам"
+            body = (
+                f"Прошу рассмотреть заявление о предоставлении академического отпуска {reason} "
+                f"с сохранением статуса обучающегося {course} курса в порядке П. {primary_id}."
+            )
+        elif any(cid.startswith("4.") for cid in clause_ids) or "бюджет" in norm:
+            subject = "Перевод с платного на бюджет"
+            ref_val = f"Конкурс на вакантные места · {course} курс (рейтинг {rating})"
+            body = (
+                f"Прошу допустить меня к участию в конкурсном отборе на переход с платного обучения "
+                f"на вакантное бюджетное место при отсутствии академической задолженности согласно П. {primary_id}."
+            )
+        elif "1.8" in clause_ids or "апелляц" in norm:
+            subject = "Апелляция результатов аттестации"
+            disc_txt = f" по дисциплине «{matched_disc}»" if matched_disc else ""
+            ref_val = date_hint or "В течение 3 рабочих дней после публикации оценки"
+            body = (
+                f"Прошу рассмотреть апелляцию по процедуре и критериям оценивания письменной работы{disc_txt} "
+                f"в соответствии с П. {primary_id}."
+            )
+        else:
+            subject = "Индивидуальный учебный план"
+            ref_val = f"Осенний семестр 2026 · {course} курс"
+            body = (
+                f"Прошу рассмотреть обращение по вопросу организации учебного процесса "
+                f"({clean_q[:120]}) на основании П. {primary_id}."
+            )
+
+    if not kind:
+        return None
+
+    params = urllib.parse.urlencode({
+        "draft": "1",
+        "cite": primary_id,
+        "subject": subject,
+        "ref": ref_val,
+        "notify": notify,
+        "comment": body[:380],
+    })
+    return {
+        "label": "Проверить черновик заявления",
+        "url": f"/requests/new/{kind}?{params}",
+    }
+
+
 def answer_question(
     question: str,
     student_ctx: dict,
@@ -690,6 +854,10 @@ def answer_question(
     if intent and (intent["requires"] is None or elig.get(intent["requires"], True)):
         seen_urls.add(intent["action"][1])
         actions.append({"label": intent["action"][0], "url": intent["action"][1]})
+    draft_action = build_petition_draft(clean_q, history, student_ctx, used_clauses)
+    if draft_action:
+        seen_urls.add(draft_action["url"])
+        actions.append(draft_action)
     blocked_prefixes = []
     if elig and not elig.get("dorm"):
         blocked_prefixes += ["/finance?tab=dorm", "/dorm"]
